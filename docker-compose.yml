@@ -1,0 +1,11 @@
+# Docker Compose skeleton for VBC CommandIQ
+# services: frontend, backend, ollama (optional)
+# To be filled in during Phase 12 (see build spec section 39)
+version: "3.9"
+services:
+  frontend:
+    build: ./frontend
+  backend:
+    build: ./backend
+  ollama:
+    image: ollama/ollama
