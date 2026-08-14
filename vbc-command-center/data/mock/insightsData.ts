@@ -1,0 +1,57 @@
+import { AIInsight } from '../../types/insights';
+
+export const mockInsights: AIInsight[] = [
+  {
+    id: 'INS-2001',
+    title: 'High Cardiology Payment Variance Driven by Advanced Imaging',
+    category: 'Cost Driver',
+    summary: 'Metropolitan Cardiology Associates Medicare payment per beneficiary ($2,643) is 42% above peer benchmarks, driven primarily by high HCPCS imaging volume.',
+    npi: '1982736450',
+    providerName: 'Metropolitan Cardiology Associates PA',
+    potentialDrivers: [
+      'High diagnostic SPECT and echocardiogram billing frequency',
+      'Complex patient risk profile (Average HCC Risk Score: 1.64)',
+      'Substantial chronic heart failure prevalence (42.1%)',
+    ],
+    suggestedAction: 'Review clinical appropriateness guidelines for diagnostic cardiac imaging and consider prior authorization optimization.',
+    impactEstimate: '$1.45M Potential Annual Savings',
+    confidenceScore: 0.94,
+    isDemo: true,
+    timestamp: 'August 13, 2026',
+  },
+  {
+    id: 'INS-2002',
+    title: 'Avoidable Emergency Department Visits in Pulmonology Cohort',
+    category: 'Utilization Anomaly',
+    summary: 'Beneficiaries managed by Dr. Marcus Vance exhibit an ED visit rate of 780 per 1,000, significantly exceeding the regional ACO benchmark of 542.',
+    npi: '1357924680',
+    providerName: 'Dr. Marcus Vance, MD',
+    potentialDrivers: [
+      '68.2% COPD prevalence in patient roster',
+      '48.2% tobacco use prevalence among active beneficiaries',
+      'Lack of same-day urgent pulmonary clinic access',
+    ],
+    suggestedAction: 'Establish an acute pulmonary exacerbation clinic and distribute remote patient monitoring (RPM) pulse oximeters.',
+    impactEstimate: '$680K Avoidable Spend Reduction',
+    confidenceScore: 0.89,
+    isDemo: true,
+    timestamp: 'August 13, 2026',
+  },
+  {
+    id: 'INS-2003',
+    title: 'Dual-Eligible Beneficiary Complexity Alignment Opportunity',
+    category: 'Risk Alignment',
+    summary: 'Midwest Physician Network ACO has a 38.5% dual-eligible beneficiary mix but risk scores appear under-coded relative to chronic disease prevalence.',
+    acoId: 'A2089',
+    acoName: 'Midwest Physician Network ACO',
+    potentialDrivers: [
+      'Incomplete annual wellness visit (AWV) completion rate (54%)',
+      'Uncaptured secondary chronic condition diagnoses during outpatient encounters',
+    ],
+    suggestedAction: 'Initiate targeted AWV outreach and provider documentation workshops prior to risk adjustment snapshot cutoffs.',
+    impactEstimate: '$920K Benchmark Adjustment Improvement',
+    confidenceScore: 0.91,
+    isDemo: true,
+    timestamp: 'August 13, 2026',
+  },
+];
