@@ -35,5 +35,6 @@ Thumbs.db
 .vscode/
 .idea/
 
-# MSSP source CSV files
-docs/mssp/**/*.csv
+# MSSP source/document files
+docs/mssp/
+data/raw/mssp/
