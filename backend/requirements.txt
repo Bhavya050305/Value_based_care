@@ -13,3 +13,4 @@ python-dotenv
 httpx
 pytest
 pytest-asyncio
+supabase
