@@ -4,4 +4,4 @@
 
 __pycache__/
 
-*.pyc
+*.pycml/models/peer_target_finder/*.csv
