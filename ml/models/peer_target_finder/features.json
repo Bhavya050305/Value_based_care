@@ -1,0 +1,28 @@
+{
+  "features": [
+    "log_N_AB",
+    "log_PMPM",
+    "CMS_HCC_RiskScore_ESRD_PY",
+    "CMS_HCC_RiskScore_DIS_PY",
+    "CMS_HCC_RiskScore_AGDU_PY",
+    "CMS_HCC_RiskScore_AGND_PY",
+    "Pct_Age_0_64",
+    "Pct_Age_65_74",
+    "Pct_Age_75_84",
+    "Pct_Age_85plus",
+    "Pct_Female",
+    "Pct_White",
+    "Pct_Black",
+    "Pct_Race_Other",
+    "Perc_Dual",
+    "ED_Visits_per_Ben",
+    "EM_Visits_per_Ben",
+    "SNF_Adm_per_Ben",
+    "PCP_per_1000",
+    "Spec_per_1000",
+    "Hosp_per_1000",
+    "Agree_Type",
+    "Risk_Model",
+    "Rev_Exp_Cat"
+  ]
+}
