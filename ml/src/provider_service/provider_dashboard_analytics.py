@@ -69,7 +69,7 @@ def validate_input(df):
         "Rndrng_NPI",
         "Year",
         "ACO_ID",
-        "provider_name_x",
+        "provider_name",
 
         # Core utilization
         "Tot_Benes",
@@ -259,7 +259,7 @@ def create_dashboard_analytics(df):
     output["Rndrng_NPI"] = df["Rndrng_NPI"]
 
     output["provider_name"] = (
-        df["provider_name_x"]
+        df["provider_name"]
     )
 
     output["ACO_ID"] = df["ACO_ID"]

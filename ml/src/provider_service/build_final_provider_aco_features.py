@@ -472,6 +472,12 @@ aco_selected = aco_mapping[
     ]
 ].copy()
 
+# Rename mapping provider name before merge
+# to avoid provider_name_x / provider_name_y.
+aco_selected = aco_selected.rename(
+    columns={"provider_name": "mapped_provider_name"}
+)
+
 print(
     f"ACO mapping columns: "
     f"{len(aco_selected.columns)}"
@@ -496,6 +502,18 @@ final_df = stage4.merge(
     on="Rndrng_NPI",
     how="left",
     validate="many_to_one",
+)
+# Preserve the Stage 4 provider name when available.
+# Fall back to the complete ACO mapping name otherwise.
+final_df["provider_name"] = (
+    final_df["provider_name"]
+    .combine_first(final_df["mapped_provider_name"])
+)
+
+final_df = final_df.drop(
+    columns=["mapped_provider_name"],
+    errors="ignore",
+
 )
 
 print(
