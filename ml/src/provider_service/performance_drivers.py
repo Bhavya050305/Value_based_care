@@ -78,7 +78,10 @@ PROVIDER_FILE = os.path.join(
 )
 
 ACO_PROVIDER_FILE = os.path.join(
-    PROCESSED_DIR,
+    BASE_DIR,
+    "data",
+    "processed",
+    "all_aco",
     "aco_provider_metrics.csv",
 )
 

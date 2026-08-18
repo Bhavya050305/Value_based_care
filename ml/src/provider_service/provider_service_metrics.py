@@ -21,9 +21,9 @@ BASE_DIR = Path(__file__).resolve().parents[3]
 INPUT_FILE = (
     BASE_DIR
     / "data"
-    / "processed"
-    / "provider_service"
-    / "synthetic_service_data.csv"
+    / "serving"
+    / "all_aco"
+    / "all_aco_provider_service.csv"
 )
 
 OUTPUT_FILE = (

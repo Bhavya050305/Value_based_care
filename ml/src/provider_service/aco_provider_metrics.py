@@ -115,6 +115,73 @@ aco = grouped.agg(
     max_provider_cost_score=("cost_score", "max"),
     max_provider_utilization_score=("utilization_score", "max"),
 )
+# ============================================================
+# PROVIDER PERFORMANCE PERCENTAGES
+# ============================================================
+#
+# These percentages are calculated from the selected providers
+# within each ACO-Year.
+#
+# High cost:
+#     cost_score >= 0.70
+#
+# High utilization:
+#     utilization_score >= 0.70
+#
+# High cost + high utilization:
+#     both conditions are true.
+#
+# The denominator is the number of providers in each ACO-Year.
+# ============================================================
+
+df["high_cost_flag"] = (
+    df["cost_score"] >= 0.70
+)
+
+df["high_utilization_flag"] = (
+    df["utilization_score"] >= 0.70
+)
+
+df["high_cost_high_utilization_flag"] = (
+    df["high_cost_flag"]
+    & df["high_utilization_flag"]
+)
+
+provider_flags = (
+    df.groupby(
+        ["ACO_ID", "Year"],
+        as_index=False
+    )
+    .agg(
+        high_cost_provider_pct=(
+            "high_cost_flag",
+            "mean"
+        ),
+        high_utilization_provider_pct=(
+            "high_utilization_flag",
+            "mean"
+        ),
+        high_cost_high_utilization_pct=(
+            "high_cost_high_utilization_flag",
+            "mean"
+        ),
+    )
+)
+
+# Convert proportions to percentages
+provider_flags[
+    [
+        "high_cost_provider_pct",
+        "high_utilization_provider_pct",
+        "high_cost_high_utilization_pct",
+    ]
+] *= 100
+
+aco = aco.merge(
+    provider_flags,
+    on=["ACO_ID", "Year"],
+    how="left",
+)
 
 # Provider-level concentration measures
 provider_cost_top = (
@@ -244,6 +311,25 @@ if duplicates_final != 0:
     )
 
 print("PASS - ACO metrics validation successful.")
+required_final_columns = [
+    "high_cost_provider_pct",
+    "high_utilization_provider_pct",
+    "high_cost_high_utilization_pct",
+]
+
+for column in required_final_columns:
+
+    if column not in aco.columns:
+        raise ValueError(
+            f"Missing final ACO metric: {column}"
+        )
+
+    if aco[column].isna().any():
+        raise ValueError(
+            f"Missing values found in {column}"
+        )
+
+print("PASS - Provider performance percentages validated.")
 
 print("\n[6/6] SAVING OUTPUT")
 
