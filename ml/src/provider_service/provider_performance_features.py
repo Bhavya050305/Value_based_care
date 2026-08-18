@@ -4,9 +4,9 @@ import numpy as np
 import pandas as pd
 
 
-# ============================================================
+# =========================================================
 # CONFIGURATION
-# ============================================================
+# =========================================================
 
 INPUT_PATH = Path(
     "data/processed/provider_service/provider_features_stage3.csv"
@@ -17,53 +17,11 @@ OUTPUT_PATH = Path(
 )
 
 
-# ============================================================
-# HELPER FUNCTION
-# ============================================================
+# =========================================================
+# LOAD STAGE 3 DATA
+# =========================================================
 
-def safe_divide(numerator, denominator):
-    """
-    Safely divide two pandas Series.
-
-    Rules:
-    - Convert numerator and denominator to numeric.
-    - Treat zero denominators as invalid.
-    - Return NaN for invalid divisions.
-    - Never allow infinity values.
-    """
-
-    numerator = pd.to_numeric(
-        numerator,
-        errors="coerce"
-    )
-
-    denominator = pd.to_numeric(
-        denominator,
-        errors="coerce"
-    )
-
-    denominator = denominator.replace(
-        0,
-        np.nan
-    )
-
-    result = numerator.div(
-        denominator
-    )
-
-    result = result.replace(
-        [np.inf, -np.inf],
-        np.nan
-    )
-
-    return result
-
-
-# ============================================================
-# LOAD DATA
-# ============================================================
-
-def load_data():
+def load_stage3_data():
 
     print("=" * 60)
     print("PROVIDER FEATURE ENGINEERING - STAGE 4")
@@ -73,9 +31,8 @@ def load_data():
     print("\nLoading Stage 3 dataset...")
 
     if not INPUT_PATH.exists():
-
         raise FileNotFoundError(
-            f"Stage 3 dataset not found:\n{INPUT_PATH}"
+            f"Input file not found:\n{INPUT_PATH}"
         )
 
     df = pd.read_csv(
@@ -83,20 +40,59 @@ def load_data():
         low_memory=False
     )
 
-    print(
-        f"Rows loaded: {len(df):,}"
-    )
+    print(f"Rows loaded: {len(df):,}")
+    print(f"Columns loaded: {len(df.columns):,}")
+
+    return df
+
+
+# =========================================================
+# REMOVE MEDICAL COMPONENT COLUMNS
+# =========================================================
+
+def exclude_medical_columns(df):
+
+    print("\n" + "=" * 60)
+    print("EXCLUDING UNRELIABLE MEDICAL COMPONENT COLUMNS")
+    print("=" * 60)
+
+    medical_columns = [
+        column
+        for column in df.columns
+        if column.startswith("Med_")
+    ]
 
     print(
-        f"Columns loaded: {len(df.columns):,}"
+        "Medical columns found:",
+        len(medical_columns)
+    )
+
+    if medical_columns:
+
+        for column in medical_columns:
+            print(f"  Removing: {column}")
+
+        df = df.drop(
+            columns=medical_columns
+        )
+
+    else:
+
+        print(
+            "No medical component columns found."
+        )
+
+    print(
+        "Columns after exclusion:",
+        len(df.columns)
     )
 
     return df
 
 
-# ============================================================
+# =========================================================
 # INPUT VALIDATION
-# ============================================================
+# =========================================================
 
 def validate_input(df):
 
@@ -105,63 +101,52 @@ def validate_input(df):
     print("=" * 60)
 
     required_columns = [
-
-        # Provider identity
         "Rndrng_NPI",
         "Year",
 
-        # Overall utilization / financial
+        # Provider utilization
         "Tot_HCPCS_Cds",
         "Tot_Benes",
         "Tot_Srvcs",
+
+        # Provider financial metrics
         "Tot_Sbmtd_Chrg",
         "Tot_Mdcr_Alowd_Amt",
         "Tot_Mdcr_Pymt_Amt",
         "Tot_Mdcr_Stdzd_Amt",
 
-        # Medical
-        "Med_Tot_Benes",
-        "Med_Tot_Srvcs",
-        "Med_Mdcr_Alowd_Amt",
-        "Med_Mdcr_Pymt_Amt",
-
-        # Drug
-        "Drug_Tot_Benes",
-        "Drug_Tot_Srvcs",
-        "Drug_Mdcr_Alowd_Amt",
-        "Drug_Mdcr_Pymt_Amt",
-
-        # Risk / condition
-        "Bene_Avg_Risk_Scre",
-        "overall_condition_burden",
-        "physical_health_burden",
-        "behavioral_health_burden",
-        "high_condition_burden_count",
-
-        # Stage 1 foundational features
+        # Existing Stage 1 efficiency features
         "services_per_beneficiary",
         "payment_per_service",
         "payment_per_beneficiary",
         "allowed_amount_per_service",
-        "standardized_amount_per_service",
-        "payment_to_allowed_ratio"
+        "allowed_amount_per_beneficiary",
+        "payment_to_allowed_ratio",
+
+        # Risk / clinical features
+        "average_risk_score",
+        "overall_condition_burden",
+
+        # Stage 3 temporal features
+        "yoy_service_change_pct",
+        "yoy_payment_change_pct",
+        "yoy_payment_per_service_change_pct",
+        "yoy_risk_score_change_pct",
+        "provider_years_observed"
     ]
 
-    missing = [
+    missing_columns = [
         column
         for column in required_columns
         if column not in df.columns
     ]
 
-    if missing:
+    if missing_columns:
 
         print("Missing required columns:")
 
-        for column in missing:
-
-            print(
-                f"- {column}"
-            )
+        for column in missing_columns:
+            print(f"- {column}")
 
         raise ValueError(
             "Stage 4 input validation failed."
@@ -171,9 +156,34 @@ def validate_input(df):
         "Required columns: PASSED"
     )
 
-    # --------------------------------------------------------
-    # NPI + YEAR GRAIN
-    # --------------------------------------------------------
+    # -----------------------------------------------------
+    # Medical column validation
+    # -----------------------------------------------------
+
+    medical_columns = [
+        column
+        for column in df.columns
+        if column.startswith("Med_")
+    ]
+
+    print(
+        "Medical columns:",
+        medical_columns
+    )
+
+    if medical_columns:
+
+        raise ValueError(
+            "Stage 4 contains forbidden medical component columns."
+        )
+
+    print(
+        "Medical column validation: PASSED"
+    )
+
+    # -----------------------------------------------------
+    # NPI + Year validation
+    # -----------------------------------------------------
 
     duplicate_count = df.duplicated(
         subset=[
@@ -183,7 +193,457 @@ def validate_input(df):
     ).sum()
 
     print(
-        f"Duplicate NPI-Year rows: "
+        "Duplicate NPI-Year rows:",
+        f"{duplicate_count:,}"
+    )
+
+    if duplicate_count != 0:
+
+        raise ValueError(
+            "NPI + Year grain has been violated."
+        )
+
+    print(
+        "NPI + Year grain: PASSED"
+    )
+
+    # -----------------------------------------------------
+    # Year validation
+    # -----------------------------------------------------
+
+    years = sorted(
+        pd.to_numeric(
+            df["Year"],
+            errors="coerce"
+        )
+        .dropna()
+        .unique()
+        .tolist()
+    )
+
+    print(
+        "Years detected:",
+        years
+    )
+
+    if not years:
+        raise ValueError(
+            "No valid years detected."
+        )
+
+
+# =========================================================
+# NUMERIC CONVERSION
+# =========================================================
+
+def convert_numeric_columns(df):
+
+    print("\n" + "=" * 60)
+    print("NUMERIC COLUMN CONVERSION")
+    print("=" * 60)
+
+    numeric_columns = [
+        "Tot_HCPCS_Cds",
+        "Tot_Benes",
+        "Tot_Srvcs",
+        "Tot_Sbmtd_Chrg",
+        "Tot_Mdcr_Alowd_Amt",
+        "Tot_Mdcr_Pymt_Amt",
+        "Tot_Mdcr_Stdzd_Amt",
+
+        "services_per_beneficiary",
+        "payment_per_service",
+        "payment_per_beneficiary",
+        "allowed_amount_per_service",
+        "allowed_amount_per_beneficiary",
+        "payment_to_allowed_ratio",
+
+        "average_risk_score",
+        "overall_condition_burden",
+
+        "yoy_service_change_pct",
+        "yoy_payment_change_pct",
+        "yoy_payment_per_service_change_pct",
+        "yoy_risk_score_change_pct",
+
+        "provider_years_observed"
+    ]
+
+    numeric_columns = [
+        column
+        for column in numeric_columns
+        if column in df.columns
+    ]
+
+    for column in numeric_columns:
+
+        df[column] = pd.to_numeric(
+            df[column],
+            errors="coerce"
+        )
+
+    print(
+        "Numeric columns converted:",
+        len(numeric_columns)
+    )
+
+    return df
+
+
+# =========================================================
+# SAFE DIVISION
+# =========================================================
+
+def safe_divide(numerator, denominator):
+
+    denominator = denominator.replace(
+        0,
+        np.nan
+    )
+
+    result = numerator / denominator
+
+    result = result.replace(
+        [np.inf, -np.inf],
+        np.nan
+    )
+
+    return result
+
+
+# =========================================================
+# CREATE PERFORMANCE FEATURES
+# =========================================================
+
+def create_performance_features(df):
+
+    print("\n" + "=" * 60)
+    print("CREATING STAGE 4 PERFORMANCE FEATURES")
+    print("=" * 60)
+
+    original_columns = set(
+        df.columns
+    )
+
+    # =====================================================
+    # A. COST EFFICIENCY
+    # =====================================================
+
+    print(
+        "\nCreating cost-efficiency features..."
+    )
+
+    df["payment_efficiency_ratio"] = safe_divide(
+        df["Tot_Mdcr_Pymt_Amt"],
+        df["Tot_Mdcr_Alowd_Amt"]
+    )
+
+    df["standardized_payment_ratio"] = safe_divide(
+        df["Tot_Mdcr_Stdzd_Amt"],
+        df["Tot_Mdcr_Alowd_Amt"]
+    )
+
+    df["payment_to_charge_ratio"] = safe_divide(
+        df["Tot_Mdcr_Pymt_Amt"],
+        df["Tot_Sbmtd_Chrg"]
+    )
+
+    df["allowed_to_charge_ratio"] = safe_divide(
+        df["Tot_Mdcr_Alowd_Amt"],
+        df["Tot_Sbmtd_Chrg"]
+    )
+
+    # =====================================================
+    # B. UTILIZATION EFFICIENCY
+    # =====================================================
+
+    print(
+        "Creating utilization-efficiency features..."
+    )
+
+    df["services_per_hcpcs"] = safe_divide(
+        df["Tot_Srvcs"],
+        df["Tot_HCPCS_Cds"]
+    )
+
+    df["beneficiaries_per_hcpcs"] = safe_divide(
+        df["Tot_Benes"],
+        df["Tot_HCPCS_Cds"]
+    )
+
+    df["services_per_provider_beneficiary"] = safe_divide(
+        df["Tot_Srvcs"],
+        df["Tot_Benes"]
+    )
+
+    # =====================================================
+    # C. FINANCIAL INTENSITY
+    # =====================================================
+
+    print(
+        "Creating financial-intensity features..."
+    )
+
+    df["payment_per_hcpcs"] = safe_divide(
+        df["Tot_Mdcr_Pymt_Amt"],
+        df["Tot_HCPCS_Cds"]
+    )
+
+    df["allowed_amount_per_hcpcs"] = safe_divide(
+        df["Tot_Mdcr_Alowd_Amt"],
+        df["Tot_HCPCS_Cds"]
+    )
+
+    df["charge_per_hcpcs"] = safe_divide(
+        df["Tot_Sbmtd_Chrg"],
+        df["Tot_HCPCS_Cds"]
+    )
+
+    # =====================================================
+    # D. RISK-ADJUSTED UTILIZATION
+    # =====================================================
+
+    print(
+        "Creating risk-adjusted utilization features..."
+    )
+
+    df["risk_adjusted_services"] = safe_divide(
+        df["Tot_Srvcs"],
+        df["average_risk_score"]
+    )
+
+    df["risk_adjusted_payment"] = safe_divide(
+        df["Tot_Mdcr_Pymt_Amt"],
+        df["average_risk_score"]
+    )
+
+    df["risk_adjusted_payment_per_beneficiary"] = safe_divide(
+        df["payment_per_beneficiary"],
+        df["average_risk_score"]
+    )
+
+    # =====================================================
+    # E. CONDITION-BURDEN ADJUSTMENT
+    # =====================================================
+
+    print(
+        "Creating condition-burden adjusted features..."
+    )
+
+    df["condition_adjusted_services"] = safe_divide(
+        df["Tot_Srvcs"],
+        df["overall_condition_burden"]
+    )
+
+    df["condition_adjusted_payment"] = safe_divide(
+        df["Tot_Mdcr_Pymt_Amt"],
+        df["overall_condition_burden"]
+    )
+
+    # =====================================================
+    # F. PERFORMANCE TREND FEATURES
+    # =====================================================
+
+    print(
+        "Creating performance-trend features..."
+    )
+
+    df["positive_service_growth_flag"] = (
+        df["yoy_service_change_pct"] > 0
+    ).astype(int)
+
+    df["positive_payment_growth_flag"] = (
+        df["yoy_payment_change_pct"] > 0
+    ).astype(int)
+
+    df["payment_efficiency_improvement_flag"] = (
+        df["yoy_payment_per_service_change_pct"] < 0
+    ).astype(int)
+
+    df["risk_increase_flag"] = (
+        df["yoy_risk_score_change_pct"] > 0
+    ).astype(int)
+
+    # =====================================================
+    # G. PERFORMANCE STABILITY
+    # =====================================================
+
+    print(
+        "Creating performance-stability features..."
+    )
+
+    df["service_growth_magnitude"] = (
+        df["yoy_service_change_pct"]
+        .abs()
+    )
+
+    df["payment_growth_magnitude"] = (
+        df["yoy_payment_change_pct"]
+        .abs()
+    )
+
+    df["payment_per_service_change_magnitude"] = (
+        df["yoy_payment_per_service_change_pct"]
+        .abs()
+    )
+
+    # =====================================================
+    # H. COMPOSITE PERFORMANCE SIGNAL
+    # =====================================================
+
+    print(
+        "Creating composite performance signal..."
+    )
+
+    efficiency_component = (
+        df["payment_efficiency_ratio"]
+        .clip(
+            lower=0,
+            upper=1
+        )
+    )
+
+    utilization_component = (
+        df["services_per_beneficiary"]
+        .rank(
+            pct=True
+        )
+    )
+
+    stability_component = (
+        1
+        -
+        (
+            df["payment_per_service_change_magnitude"]
+            .clip(
+                lower=0,
+                upper=100
+            )
+            / 100
+        )
+    )
+
+    risk_component = (
+        1
+        -
+        (
+            df["average_risk_score"]
+            .rank(
+                pct=True
+            )
+        )
+    )
+
+    df["performance_signal"] = (
+        0.35 * efficiency_component
+        +
+        0.25 * utilization_component
+        +
+        0.25 * stability_component
+        +
+        0.15 * risk_component
+    )
+
+    # =====================================================
+    # I. PERFORMANCE TIER
+    # =====================================================
+
+    print(
+        "Creating performance tier..."
+    )
+
+    df["performance_tier"] = pd.cut(
+        df["performance_signal"],
+        bins=[
+            -np.inf,
+            0.25,
+            0.50,
+            0.75,
+            np.inf
+        ],
+        labels=[
+            "Needs Improvement",
+            "Developing",
+            "Strong",
+            "High Performer"
+        ]
+    )
+
+    # =====================================================
+    # NEW FEATURE SUMMARY
+    # =====================================================
+
+    new_columns = [
+        column
+        for column in df.columns
+        if column not in original_columns
+    ]
+
+    print("\n" + "=" * 60)
+    print("STAGE 4 FEATURE SUMMARY")
+    print("=" * 60)
+
+    print(
+        "New features created:",
+        len(new_columns)
+    )
+
+    for column in new_columns:
+        print(
+            f"- {column}"
+        )
+
+    return df
+
+
+# =========================================================
+# VALIDATE OUTPUT
+# =========================================================
+
+def validate_output(df):
+
+    print("\n" + "=" * 60)
+    print("STAGE 4 OUTPUT VALIDATION")
+    print("=" * 60)
+
+    # -----------------------------------------------------
+    # Medical columns
+    # -----------------------------------------------------
+
+    medical_columns = [
+        column
+        for column in df.columns
+        if column.startswith("Med_")
+    ]
+
+    print(
+        "Medical columns:",
+        medical_columns
+    )
+
+    if medical_columns:
+
+        raise ValueError(
+            "Medical columns detected in Stage 4 output."
+        )
+
+    print(
+        "Medical column exclusion: PASSED"
+    )
+
+    # -----------------------------------------------------
+    # Grain
+    # -----------------------------------------------------
+
+    duplicate_count = df.duplicated(
+        subset=[
+            "Rndrng_NPI",
+            "Year"
+        ]
+    ).sum()
+
+    print(
+        "Duplicate NPI-Year rows:",
         f"{duplicate_count:,}"
     )
 
@@ -197,588 +657,24 @@ def validate_input(df):
         "NPI + Year grain: PASSED"
     )
 
+    # -----------------------------------------------------
+    # Infinite values
+    # -----------------------------------------------------
 
-# ============================================================
-# PERFORMANCE FEATURES
-# ============================================================
-
-def create_performance_features(df):
-
-    print("\n" + "=" * 60)
-    print("CREATING PROVIDER PERFORMANCE FEATURES")
-    print("=" * 60)
-
-    new_features = {}
-
-    # ========================================================
-    # 1. SERVICE INTENSITY
-    # ========================================================
-
-    print(
-        "\nCreating service intensity features..."
+    numeric_df = df.select_dtypes(
+        include=[np.number]
     )
 
-    new_features[
-        "service_intensity_per_beneficiary"
-    ] = safe_divide(
-        df["Tot_Srvcs"],
-        df["Tot_Benes"]
-    )
-
-    new_features[
-        "hcpcs_intensity_per_beneficiary"
-    ] = safe_divide(
-        df["Tot_HCPCS_Cds"],
-        df["Tot_Benes"]
-    )
-
-    new_features[
-        "services_per_condition_burden"
-    ] = safe_divide(
-        df["Tot_Srvcs"],
-        df["overall_condition_burden"]
-    )
-
-    new_features[
-        "services_per_risk_score"
-    ] = safe_divide(
-        df["Tot_Srvcs"],
-        df["Bene_Avg_Risk_Scre"]
-    )
-
-    # ========================================================
-    # 2. PAYMENT EFFICIENCY
-    # ========================================================
-
-    print(
-        "Creating payment efficiency features..."
-    )
-
-    new_features[
-        "payment_efficiency"
-    ] = safe_divide(
-        df["Tot_Mdcr_Pymt_Amt"],
-        df["Tot_Mdcr_Alowd_Amt"]
-    )
-
-    new_features[
-        "standardized_payment_ratio"
-    ] = safe_divide(
-        df["Tot_Mdcr_Stdzd_Amt"],
-        df["Tot_Mdcr_Pymt_Amt"]
-    )
-
-    new_features[
-        "payment_to_charge_ratio"
-    ] = safe_divide(
-        df["Tot_Mdcr_Pymt_Amt"],
-        df["Tot_Sbmtd_Chrg"]
-    )
-
-    new_features[
-        "allowed_to_charge_ratio"
-    ] = safe_divide(
-        df["Tot_Mdcr_Alowd_Amt"],
-        df["Tot_Sbmtd_Chrg"]
-    )
-
-    # ========================================================
-    # 3. STANDARDIZED PAYMENT DIFFERENCE
-    # ========================================================
-
-    print(
-        "Creating standardized payment features..."
-    )
-
-    new_features[
-        "payment_vs_standardized_difference"
-    ] = (
-        pd.to_numeric(
-            df["Tot_Mdcr_Pymt_Amt"],
-            errors="coerce"
-        )
-        -
-        pd.to_numeric(
-            df["Tot_Mdcr_Stdzd_Amt"],
-            errors="coerce"
-        )
-    )
-
-    new_features[
-        "payment_vs_standardized_pct"
-    ] = safe_divide(
-        (
-            pd.to_numeric(
-                df["Tot_Mdcr_Pymt_Amt"],
-                errors="coerce"
-            )
-            -
-            pd.to_numeric(
-                df["Tot_Mdcr_Stdzd_Amt"],
-                errors="coerce"
-            )
-        ),
-        df["Tot_Mdcr_Stdzd_Amt"]
-    )
-
-    # ========================================================
-    # 4. RISK-ADJUSTED UTILIZATION
-    # ========================================================
-
-    print(
-        "Creating risk-adjusted utilization features..."
-    )
-
-    risk_adjusted_beneficiary_base = (
-        pd.to_numeric(
-            df["Tot_Benes"],
-            errors="coerce"
-        )
-        *
-        pd.to_numeric(
-            df["Bene_Avg_Risk_Scre"],
-            errors="coerce"
-        )
-    )
-
-    new_features[
-        "risk_adjusted_services"
-    ] = safe_divide(
-        df["Tot_Srvcs"],
-        risk_adjusted_beneficiary_base
-    )
-
-    new_features[
-        "risk_adjusted_payment"
-    ] = safe_divide(
-        df["Tot_Mdcr_Pymt_Amt"],
-        risk_adjusted_beneficiary_base
-    )
-
-    new_features[
-        "risk_adjusted_allowed_amount"
-    ] = safe_divide(
-        df["Tot_Mdcr_Alowd_Amt"],
-        risk_adjusted_beneficiary_base
-    )
-
-    # ========================================================
-    # 5. CONDITION-BURDEN ADJUSTED FEATURES
-    # ========================================================
-
-    print(
-        "Creating condition-burden adjusted features..."
-    )
-
-    condition_adjusted_beneficiary_base = (
-        pd.to_numeric(
-            df["Tot_Benes"],
-            errors="coerce"
-        )
-        *
-        (
-            1
-            +
-            pd.to_numeric(
-                df["overall_condition_burden"],
-                errors="coerce"
-            )
-            /
-            100
-        )
-    )
-
-    new_features[
-        "condition_adjusted_payment"
-    ] = safe_divide(
-        df["Tot_Mdcr_Pymt_Amt"],
-        condition_adjusted_beneficiary_base
-    )
-
-    new_features[
-        "condition_adjusted_services"
-    ] = safe_divide(
-        df["Tot_Srvcs"],
-        condition_adjusted_beneficiary_base
-    )
-
-    # ========================================================
-    # 6. BENEFICIARY COST FEATURES
-    # ========================================================
-
-    print(
-        "Creating beneficiary cost features..."
-    )
-
-    new_features[
-        "payment_per_risk_adjusted_beneficiary"
-    ] = safe_divide(
-        df["Tot_Mdcr_Pymt_Amt"],
-        risk_adjusted_beneficiary_base
-    )
-
-    new_features[
-        "allowed_per_risk_adjusted_beneficiary"
-    ] = safe_divide(
-        df["Tot_Mdcr_Alowd_Amt"],
-        risk_adjusted_beneficiary_base
-    )
-
-    # ========================================================
-    # 7. MEDICAL PERFORMANCE
-    # ========================================================
-
-    print(
-        "Creating medical performance features..."
-    )
-
-    new_features[
-        "medical_payment_per_service"
-    ] = safe_divide(
-        df["Med_Mdcr_Pymt_Amt"],
-        df["Med_Tot_Srvcs"]
-    )
-
-    new_features[
-        "medical_allowed_per_service"
-    ] = safe_divide(
-        df["Med_Mdcr_Alowd_Amt"],
-        df["Med_Tot_Srvcs"]
-    )
-
-    new_features[
-        "medical_payment_per_beneficiary"
-    ] = safe_divide(
-        df["Med_Mdcr_Pymt_Amt"],
-        df["Med_Tot_Benes"]
-    )
-
-    # ========================================================
-    # 8. DRUG PERFORMANCE
-    # ========================================================
-
-    print(
-        "Creating drug performance features..."
-    )
-
-    new_features[
-        "drug_payment_per_service_stage4"
-    ] = safe_divide(
-        df["Drug_Mdcr_Pymt_Amt"],
-        df["Drug_Tot_Srvcs"]
-    )
-
-    new_features[
-        "drug_allowed_per_service_stage4"
-    ] = safe_divide(
-        df["Drug_Mdcr_Alowd_Amt"],
-        df["Drug_Tot_Srvcs"]
-    )
-
-    new_features[
-        "drug_payment_per_beneficiary_stage4"
-    ] = safe_divide(
-        df["Drug_Mdcr_Pymt_Amt"],
-        df["Drug_Tot_Benes"]
-    )
-
-    # ========================================================
-    # 9. MEDICAL VS DRUG MIX
-    # ========================================================
-
-    print(
-        "Creating service mix performance features..."
-    )
-
-    new_features[
-        "medical_payment_share"
-    ] = safe_divide(
-        df["Med_Mdcr_Pymt_Amt"],
-        df["Tot_Mdcr_Pymt_Amt"]
-    )
-
-    new_features[
-        "drug_payment_share"
-    ] = safe_divide(
-        df["Drug_Mdcr_Pymt_Amt"],
-        df["Tot_Mdcr_Pymt_Amt"]
-    )
-
-    new_features[
-        "medical_service_share_stage4"
-    ] = safe_divide(
-        df["Med_Tot_Srvcs"],
-        df["Tot_Srvcs"]
-    )
-
-    new_features[
-        "drug_service_share_stage4"
-    ] = safe_divide(
-        df["Drug_Tot_Srvcs"],
-        df["Tot_Srvcs"]
-    )
-
-    # ========================================================
-    # SUPPRESSION-AWARE COMPONENT SHARE HANDLING
-    # ========================================================
-
-    print(
-        "Applying suppression-aware component share handling..."
-    )
-
-    if "drug_data_suppressed" in df.columns:
-
-        suppressed_mask = (
-            df["drug_data_suppressed"]
-            .fillna(False)
-            .astype(bool)
-        )
-
-        suppressed_count = int(
-            suppressed_mask.sum()
-        )
-
-        print(
-            f"Suppressed rows detected: "
-            f"{suppressed_count:,}"
-        )
-
-        # IMPORTANT:
-        # new_features is a dictionary.
-        # Therefore we cannot use:
-        #
-        # new_features.loc[...]
-        #
-        # Instead, each dictionary value is a pandas Series
-        # and must be modified individually.
-
-        new_features[
-            "medical_payment_share"
-        ] = new_features[
-            "medical_payment_share"
-        ].mask(
-            suppressed_mask,
-            np.nan
-        )
-
-        new_features[
-            "drug_payment_share"
-        ] = new_features[
-            "drug_payment_share"
-        ].mask(
-            suppressed_mask,
-            np.nan
-        )
-
-        new_features[
-            "medical_service_share_stage4"
-        ] = new_features[
-            "medical_service_share_stage4"
-        ].mask(
-            suppressed_mask,
-            np.nan
-        )
-
-        new_features[
-            "drug_service_share_stage4"
-        ] = new_features[
-            "drug_service_share_stage4"
-        ].mask(
-            suppressed_mask,
-            np.nan
-        )
-
-        print(
-            "Suppressed component shares marked unavailable: PASSED"
-        )
-
-    else:
-
-        print(
-            "drug_data_suppressed column not present."
-        )
-
-    # ========================================================
-    # 10. TEMPORAL PERFORMANCE INDICATORS
-    # ========================================================
-
-    print(
-        "Creating temporal performance indicators..."
-    )
-
-    if "yoy_payment_change_pct" in df.columns:
-
-        new_features[
-            "performance_payment_trend"
-        ] = df[
-            "yoy_payment_change_pct"
-        ]
-
-    if "yoy_service_change_pct" in df.columns:
-
-        new_features[
-            "performance_service_trend"
-        ] = df[
-            "yoy_service_change_pct"
-        ]
-
-    if "yoy_beneficiary_change_pct" in df.columns:
-
-        new_features[
-            "performance_beneficiary_trend"
-        ] = df[
-            "yoy_beneficiary_change_pct"
-        ]
-
-    if "yoy_payment_per_service_change_pct" in df.columns:
-
-        new_features[
-            "performance_payment_per_service_trend"
-        ] = df[
-            "yoy_payment_per_service_change_pct"
-        ]
-
-    if "yoy_risk_score_change_pct" in df.columns:
-
-        new_features[
-            "performance_risk_trend"
-        ] = df[
-            "yoy_risk_score_change_pct"
-        ]
-
-    # ========================================================
-    # ADD ALL FEATURES AT ONCE
-    # ========================================================
-
-    feature_df = pd.DataFrame(
-        new_features,
-        index=df.index
-    )
-
-    df = pd.concat(
-        [
-            df,
-            feature_df
-        ],
-        axis=1
+    infinite_count = int(
+        np.isinf(
+            numeric_df
+        ).sum()
+        .sum()
     )
 
     print(
-        f"\nNew performance features created: "
-        f"{len(new_features)}"
-    )
-
-    for feature in new_features:
-
-        print(
-            f"- {feature}"
-        )
-
-    return df, list(
-        new_features.keys()
-    )
-
-
-# ============================================================
-# FEATURE VALIDATION
-# ============================================================
-
-def validate_features(
-    df,
-    new_features
-):
-
-    print("\n" + "=" * 60)
-    print("STAGE 4 FEATURE VALIDATION")
-    print("=" * 60)
-
-    # --------------------------------------------------------
-    # FEATURE EXISTENCE
-    # --------------------------------------------------------
-
-    missing = [
-        feature
-        for feature in new_features
-        if feature not in df.columns
-    ]
-
-    if missing:
-
-        print("Missing features:")
-
-        for feature in missing:
-
-            print(
-                f"- {feature}"
-            )
-
-        raise ValueError(
-            "Stage 4 feature creation failed."
-        )
-
-    print(
-        "All expected performance features exist: PASSED"
-    )
-
-    # --------------------------------------------------------
-    # ROW COUNT
-    # --------------------------------------------------------
-
-    if len(df) != 150000:
-
-        raise ValueError(
-            f"Unexpected row count: "
-            f"{len(df):,}"
-        )
-
-    print(
-        "Row count preservation: PASSED "
-        f"({len(df):,})"
-    )
-
-    # --------------------------------------------------------
-    # NPI-YEAR GRAIN
-    # --------------------------------------------------------
-
-    duplicate_count = df.duplicated(
-        subset=[
-            "Rndrng_NPI",
-            "Year"
-        ]
-    ).sum()
-
-    print(
-        f"Duplicate NPI-Year rows: "
-        f"{duplicate_count:,}"
-    )
-
-    if duplicate_count != 0:
-
-        raise ValueError(
-            "NPI-Year uniqueness failed."
-        )
-
-    print(
-        "NPI + Year grain: PASSED"
-    )
-
-    # --------------------------------------------------------
-    # INFINITE VALUES
-    # --------------------------------------------------------
-
-    numeric_new_features = df[
-        new_features
-    ].select_dtypes(
-        include=np.number
-    )
-
-    infinite_count = np.isinf(
-        numeric_new_features.to_numpy()
-    ).sum()
-
-    print(
-        f"Infinite values: "
-        f"{infinite_count:,}"
+        "Infinite values:",
+        infinite_count
     )
 
     if infinite_count != 0:
@@ -791,93 +687,61 @@ def validate_features(
         "Infinite-value validation: PASSED"
     )
 
-    # --------------------------------------------------------
-    # NULL SUMMARY
-    # --------------------------------------------------------
+    # -----------------------------------------------------
+    # Performance features
+    # -----------------------------------------------------
 
-    print(
-        "\nNull counts in performance features:"
-    )
-
-    null_counts = (
-        df[new_features]
-        .isna()
-        .sum()
-    )
-
-    null_features = null_counts[
-        null_counts > 0
-    ]
-
-    if len(null_features) == 0:
-
-        print(
-            "No null values detected."
-        )
-
-    else:
-
-        for feature, count in null_features.items():
-
-            print(
-                f"- {feature}: {count:,}"
-            )
-
-    # --------------------------------------------------------
-    # SUMMARY STATISTICS
-    # --------------------------------------------------------
-
-    print(
-        "\nPerformance feature summary:"
-    )
-
-    summary_features = [
-
-        "service_intensity_per_beneficiary",
-
-        "payment_efficiency",
-
+    expected_features = [
+        "payment_efficiency_ratio",
         "standardized_payment_ratio",
-
         "payment_to_charge_ratio",
-
         "allowed_to_charge_ratio",
-
-        "payment_vs_standardized_pct",
-
+        "services_per_hcpcs",
+        "beneficiaries_per_hcpcs",
+        "payment_per_hcpcs",
+        "allowed_amount_per_hcpcs",
+        "charge_per_hcpcs",
         "risk_adjusted_services",
-
         "risk_adjusted_payment",
-
-        "condition_adjusted_payment"
+        "risk_adjusted_payment_per_beneficiary",
+        "condition_adjusted_services",
+        "condition_adjusted_payment",
+        "positive_service_growth_flag",
+        "positive_payment_growth_flag",
+        "payment_efficiency_improvement_flag",
+        "risk_increase_flag",
+        "service_growth_magnitude",
+        "payment_growth_magnitude",
+        "payment_per_service_change_magnitude",
+        "performance_signal",
+        "performance_tier"
     ]
 
-    available_summary_features = [
-        feature
-        for feature in summary_features
-        if feature in df.columns
+    missing_features = [
+        column
+        for column in expected_features
+        if column not in df.columns
     ]
 
-    if available_summary_features:
+    if missing_features:
 
-        print(
-            df[
-                available_summary_features
-            ]
-            .describe()
-            .round(4)
-            .to_string()
+        raise ValueError(
+            f"Missing Stage 4 features: {missing_features}"
         )
 
+    print(
+        "Expected performance features: PASSED"
+    )
 
-# ============================================================
-# SAVE DATASET
-# ============================================================
 
-def save_dataset(df):
+# =========================================================
+# SAVE OUTPUT
+# =========================================================
+
+def save_output(df):
 
     print("\n" + "=" * 60)
-    print("STAGE 4 DATASET SAVING")
+    print("SAVING STAGE 4 DATASET")
     print("=" * 60)
 
     OUTPUT_PATH.parent.mkdir(
@@ -902,29 +766,45 @@ def save_dataset(df):
         f"Columns: {len(df.columns):,}"
     )
 
+    print(
+        "Medical columns:",
+        [
+            column
+            for column in df.columns
+            if column.startswith("Med_")
+        ]
+    )
 
-# ============================================================
+
+# =========================================================
 # MAIN
-# ============================================================
+# =========================================================
 
 def main():
 
-    df = load_data()
+    df = load_stage3_data()
+
+    df = exclude_medical_columns(
+        df
+    )
 
     validate_input(
         df
     )
 
-    df, new_features = create_performance_features(
+    df = convert_numeric_columns(
         df
     )
 
-    validate_features(
-        df,
-        new_features
+    df = create_performance_features(
+        df
     )
 
-    save_dataset(
+    validate_output(
+        df
+    )
+
+    save_output(
         df
     )
 
@@ -933,10 +813,5 @@ def main():
     print("=" * 60)
 
 
-# ============================================================
-# ENTRY POINT
-# ============================================================
-
 if __name__ == "__main__":
-
     main()

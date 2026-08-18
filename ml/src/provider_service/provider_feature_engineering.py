@@ -30,12 +30,14 @@ def load_clean_data():
     print("\nLoading cleaned provider dataset...")
 
     if not INPUT_PATH.exists():
-
         raise FileNotFoundError(
             f"Input file not found:\n{INPUT_PATH}"
         )
 
-    df = pd.read_csv(INPUT_PATH)
+    df = pd.read_csv(
+        INPUT_PATH,
+        low_memory=False
+    )
 
     print(
         f"Rows loaded: {len(df):,}"
@@ -59,15 +61,23 @@ def validate_input(df):
     print("=" * 60)
 
     required_columns = [
+
+        # Identity / grain
         "Rndrng_NPI",
         "Year",
+
+        # Overall utilization
         "Tot_HCPCS_Cds",
         "Tot_Benes",
         "Tot_Srvcs",
+
+        # Overall Medicare cost
         "Tot_Sbmtd_Chrg",
         "Tot_Mdcr_Alowd_Amt",
         "Tot_Mdcr_Pymt_Amt",
         "Tot_Mdcr_Stdzd_Amt",
+
+        # Drug component
         "Drug_Tot_HCPCS_Cds",
         "Drug_Tot_Benes",
         "Drug_Tot_Srvcs",
@@ -75,13 +85,8 @@ def validate_input(df):
         "Drug_Mdcr_Alowd_Amt",
         "Drug_Mdcr_Pymt_Amt",
         "Drug_Mdcr_Stdzd_Amt",
-        "Med_Tot_HCPCS_Cds",
-        "Med_Tot_Benes",
-        "Med_Tot_Srvcs",
-        "Med_Sbmtd_Chrg",
-        "Med_Mdcr_Alowd_Amt",
-        "Med_Mdcr_Pymt_Amt",
-        "Med_Mdcr_Stdzd_Amt",
+
+        # Beneficiary demographics / risk
         "Bene_Avg_Age",
         "Bene_Feml_Cnt",
         "Bene_Male_Cnt",
@@ -107,8 +112,40 @@ def validate_input(df):
             "Input validation failed."
         )
 
+    # -----------------------------------------------------
+    # Confirm medical columns are NOT present
+    # -----------------------------------------------------
+
+    medical_columns = [
+        column
+        for column in df.columns
+        if column.startswith("Med_")
+    ]
+
     print(
-        "Required columns: PASSED"
+        "\nMedical columns present:",
+        len(medical_columns)
+    )
+
+    if medical_columns:
+
+        print(
+            "Unexpected medical columns:"
+        )
+
+        for column in medical_columns:
+            print(f"- {column}")
+
+        raise ValueError(
+            "Medical component columns should have been removed."
+        )
+
+    print(
+        "Medical component exclusion: PASSED"
+    )
+
+    print(
+        "\nRequired columns: PASSED"
     )
 
     # -----------------------------------------------------
@@ -155,6 +192,7 @@ def convert_numeric_columns(df):
         "Rndrng_Prvdr_First_Name",
         "Rndrng_Prvdr_City",
         "Rndrng_Prvdr_State_Abrvtn",
+        "Rndrng_Prvdr_Zip5",
         "Rndrng_Prvdr_RUCA_Desc",
         "Rndrng_Prvdr_Type",
         "provider_name",
@@ -219,19 +257,16 @@ def create_stage1_features(df):
 
     print("\nCreating utilization features...")
 
-    # Services per beneficiary
     df["services_per_beneficiary"] = safe_divide(
         df["Tot_Srvcs"],
         df["Tot_Benes"]
     )
 
-    # HCPCS codes per beneficiary
     df["hcpcs_codes_per_beneficiary"] = safe_divide(
         df["Tot_HCPCS_Cds"],
         df["Tot_Benes"]
     )
 
-    # Services per HCPCS code
     df["services_per_hcpcs"] = safe_divide(
         df["Tot_Srvcs"],
         df["Tot_HCPCS_Cds"]
@@ -243,13 +278,11 @@ def create_stage1_features(df):
 
     print("Creating charge features...")
 
-    # Submitted charge per service
     df["submitted_charge_per_service"] = safe_divide(
         df["Tot_Sbmtd_Chrg"],
         df["Tot_Srvcs"]
     )
 
-    # Submitted charge per beneficiary
     df["submitted_charge_per_beneficiary"] = safe_divide(
         df["Tot_Sbmtd_Chrg"],
         df["Tot_Benes"]
@@ -362,54 +395,7 @@ def create_stage1_features(df):
     )
 
     # =====================================================
-    # I. MEDICAL UTILIZATION
-    # =====================================================
-
-    print("Creating medical utilization features...")
-
-    df["medical_service_share"] = safe_divide(
-        df["Med_Tot_Srvcs"],
-        df["Tot_Srvcs"]
-    )
-
-    df["medical_beneficiary_share"] = safe_divide(
-        df["Med_Tot_Benes"],
-        df["Tot_Benes"]
-    )
-
-    df["medical_hcpcs_share"] = safe_divide(
-        df["Med_Tot_HCPCS_Cds"],
-        df["Tot_HCPCS_Cds"]
-    )
-
-    df["medical_services_per_beneficiary"] = safe_divide(
-        df["Med_Tot_Srvcs"],
-        df["Med_Tot_Benes"]
-    )
-
-    # =====================================================
-    # J. MEDICAL COST
-    # =====================================================
-
-    print("Creating medical cost features...")
-
-    df["medical_payment_per_service"] = safe_divide(
-        df["Med_Mdcr_Pymt_Amt"],
-        df["Med_Tot_Srvcs"]
-    )
-
-    df["medical_payment_per_beneficiary"] = safe_divide(
-        df["Med_Mdcr_Pymt_Amt"],
-        df["Med_Tot_Benes"]
-    )
-
-    df["medical_allowed_per_service"] = safe_divide(
-        df["Med_Mdcr_Alowd_Amt"],
-        df["Med_Tot_Srvcs"]
-    )
-
-    # =====================================================
-    # K. BENEFICIARY MIX
+    # I. BENEFICIARY MIX
     # =====================================================
 
     print("Creating beneficiary mix features...")
@@ -435,7 +421,7 @@ def create_stage1_features(df):
     )
 
     # =====================================================
-    # L. BENEFICIARY DEMOGRAPHICS
+    # J. BENEFICIARY DEMOGRAPHICS
     # =====================================================
 
     print("Creating beneficiary demographic features...")
@@ -468,7 +454,6 @@ def create_stage1_features(df):
     )
 
     for column in new_columns:
-
         print(
             f"- {column}"
         )
@@ -487,36 +472,39 @@ def validate_features(df):
     print("=" * 60)
 
     feature_columns = [
+
         "services_per_beneficiary",
         "hcpcs_codes_per_beneficiary",
         "services_per_hcpcs",
+
         "submitted_charge_per_service",
         "submitted_charge_per_beneficiary",
+
         "allowed_amount_per_service",
         "allowed_amount_per_beneficiary",
+
         "payment_per_service",
         "payment_per_beneficiary",
+
         "standardized_amount_per_service",
         "standardized_amount_per_beneficiary",
+
         "payment_to_allowed_ratio",
+
         "drug_service_share",
         "drug_beneficiary_share",
         "drug_hcpcs_share",
         "drug_services_per_beneficiary",
+
         "drug_payment_per_service",
         "drug_payment_per_beneficiary",
         "drug_allowed_per_service",
-        "medical_service_share",
-        "medical_beneficiary_share",
-        "medical_hcpcs_share",
-        "medical_services_per_beneficiary",
-        "medical_payment_per_service",
-        "medical_payment_per_beneficiary",
-        "medical_allowed_per_service",
+
         "female_share",
         "male_share",
         "dual_share",
         "nondual_share",
+
         "average_beneficiary_age",
         "beneficiary_risk_score",
     ]
@@ -538,7 +526,9 @@ def validate_features(df):
         "All expected features exist: PASSED"
     )
 
-    print("\nNull counts in engineered features:")
+    print(
+        "\nNull counts in engineered features:"
+    )
 
     null_summary = (
         df[feature_columns]
@@ -581,6 +571,31 @@ def validate_features(df):
 
     print(
         "Infinite value validation: PASSED"
+    )
+
+    # -----------------------------------------------------
+    # Medical column validation
+    # -----------------------------------------------------
+
+    medical_columns = [
+        column
+        for column in df.columns
+        if column.startswith("Med_")
+    ]
+
+    print(
+        "\nMedical columns in Stage 1:",
+        medical_columns
+    )
+
+    if medical_columns:
+
+        raise ValueError(
+            "Medical columns unexpectedly present in Stage 1 output."
+        )
+
+    print(
+        "Medical column exclusion: PASSED"
     )
 
 

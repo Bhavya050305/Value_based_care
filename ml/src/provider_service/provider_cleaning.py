@@ -17,12 +17,39 @@ SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
 
 TABLE_NAME = "provider_combined"
 
-# IMPORTANT:
-# This is a cleaned provider_combined dataset.
-# We are NOT claiming NPI + Year is the final grain yet.
 OUTPUT_PATH = Path(
     "data/processed/provider_service/provider_combined_clean.csv"
 )
+
+
+# =========================================================
+# COLUMNS EXCLUDED FROM PROVIDER ANALYTICS
+# =========================================================
+#
+# These medical component columns contain suspicious/default
+# repeated values in the current source extract.
+#
+# Example observed values:
+# Med_Tot_Benes = 139
+# Med_Tot_Srvcs = 349
+# Med_Mdcr_Pymt_Amt = 20606.13
+#
+# We therefore exclude the entire Med_* component rather than
+# allowing these fields to enter downstream feature engineering.
+#
+# The raw Supabase source is NOT modified.
+# Only the local analytical dataset is reduced.
+# =========================================================
+
+EXCLUDED_COLUMNS = [
+    "Med_Tot_Benes",
+    "Med_Tot_HCPCS_Cds",
+    "Med_Tot_Srvcs",
+    "Med_Sbmtd_Chrg",
+    "Med_Mdcr_Alowd_Amt",
+    "Med_Mdcr_Pymt_Amt",
+    "Med_Mdcr_Stdzd_Amt",
+]
 
 
 # =========================================================
@@ -61,7 +88,7 @@ def fetch_all_records(
     using deterministic pagination ordering.
 
     The Supabase source table is read-only.
-    No records are modified.
+    No source records are modified.
     """
 
     all_rows = []
@@ -113,6 +140,61 @@ def fetch_all_records(
     print()
 
     return pd.DataFrame(all_rows)
+
+
+# =========================================================
+# REMOVE EXCLUDED COMPONENT COLUMNS
+# =========================================================
+
+def remove_excluded_columns(df):
+
+    print("\n" + "=" * 60)
+    print("EXCLUDING UNRELIABLE MEDICAL COMPONENT COLUMNS")
+    print("=" * 60)
+
+    columns_present = [
+        column
+        for column in EXCLUDED_COLUMNS
+        if column in df.columns
+    ]
+
+    columns_missing = [
+        column
+        for column in EXCLUDED_COLUMNS
+        if column not in df.columns
+    ]
+
+    print(
+        "Medical columns found:",
+        len(columns_present)
+    )
+
+    for column in columns_present:
+        print(
+            f"  Removing: {column}"
+        )
+
+    if columns_missing:
+
+        print(
+            "\nAlready absent:"
+        )
+
+        for column in columns_missing:
+            print(
+                f"  {column}"
+            )
+
+    df = df.drop(
+        columns=columns_present
+    ).copy()
+
+    print(
+        "\nColumns after exclusion:",
+        len(df.columns)
+    )
+
+    return df
 
 
 # =========================================================
@@ -190,7 +272,6 @@ def clean_provider_data(df):
             "Cleaning stopped."
         )
 
-    # Convert to integer after validation
     df["Year"] = df["Year"].astype(int)
 
     detected_years = sorted(
@@ -240,18 +321,6 @@ def clean_provider_data(df):
 
     # -----------------------------------------------------
     # EXACT DUPLICATE DETECTION
-    # -----------------------------------------------------
-    #
-    # IMPORTANT:
-    # We compare ALL columns.
-    #
-    # We do NOT use:
-    #     subset=["NPI", "Year"]
-    #
-    # We do NOT use a manually selected subset of columns.
-    #
-    # Only fully identical records are considered
-    # exact duplicates.
     # -----------------------------------------------------
 
     print("\n" + "=" * 60)
@@ -311,14 +380,6 @@ def clean_provider_data(df):
 
     # -----------------------------------------------------
     # NPI + YEAR GRAIN INSPECTION
-    # -----------------------------------------------------
-    #
-    # IMPORTANT:
-    # We are NOT assuming NPI + Year is the final grain.
-    #
-    # If duplicates exist, we report them.
-    # We do NOT remove them.
-    # We do NOT aggregate them.
     # -----------------------------------------------------
 
     print("\n" + "=" * 60)
@@ -545,9 +606,23 @@ def main():
         f"\nTotal records fetched: {len(df):,}"
     )
 
+    # =====================================================
+    # EXCLUDE PROBLEMATIC MEDICAL COMPONENT COLUMNS
+    # =====================================================
+
+    df = remove_excluded_columns(df)
+
+    # =====================================================
+    # CLEAN DATASET
+    # =====================================================
+
     clean_df = clean_provider_data(
         df
     )
+
+    # =====================================================
+    # SAVE
+    # =====================================================
 
     save_clean_dataset(
         clean_df
@@ -563,4 +638,4 @@ def main():
 # =========================================================
 
 if __name__ == "__main__":
-    main()
+    main()  

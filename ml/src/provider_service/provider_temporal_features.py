@@ -31,7 +31,6 @@ def load_stage2_data():
     print("\nLoading Stage 2 dataset...")
 
     if not INPUT_PATH.exists():
-
         raise FileNotFoundError(
             f"Input file not found:\n{INPUT_PATH}"
         )
@@ -47,6 +46,52 @@ def load_stage2_data():
 
     print(
         f"Columns loaded: {len(df.columns):,}"
+    )
+
+    return df
+
+
+# =========================================================
+# REMOVE UNRELIABLE MEDICAL COMPONENT COLUMNS
+# =========================================================
+
+def exclude_medical_columns(df):
+
+    print("\n" + "=" * 60)
+    print("EXCLUDING UNRELIABLE MEDICAL COMPONENT COLUMNS")
+    print("=" * 60)
+
+    medical_columns = [
+        column
+        for column in df.columns
+        if column.startswith("Med_")
+    ]
+
+    print(
+        "Medical columns found:",
+        len(medical_columns)
+    )
+
+    if medical_columns:
+
+        for column in medical_columns:
+            print(
+                f"  Removing: {column}"
+            )
+
+        df = df.drop(
+            columns=medical_columns
+        )
+
+    else:
+
+        print(
+            "No medical component columns found."
+        )
+
+    print(
+        "Columns after exclusion:",
+        len(df.columns)
     )
 
     return df
@@ -84,8 +129,13 @@ def validate_input(df):
 
     if missing_columns:
 
+        print("Missing required columns:")
+
+        for column in missing_columns:
+            print(f"- {column}")
+
         raise ValueError(
-            f"Missing required columns: {missing_columns}"
+            "Stage 3 input validation failed."
         )
 
     print(
@@ -93,25 +143,30 @@ def validate_input(df):
     )
 
     # -----------------------------------------------------
-    # Convert identifiers
+    # NPI conversion
     # -----------------------------------------------------
 
-    df["Rndrng_NPI"] = (
-        pd.to_numeric(
-            df["Rndrng_NPI"],
-            errors="coerce"
-        )
+    df["Rndrng_NPI"] = pd.to_numeric(
+        df["Rndrng_NPI"],
+        errors="coerce"
     )
 
-    df["Year"] = (
-        pd.to_numeric(
-            df["Year"],
-            errors="coerce"
-        )
+    # -----------------------------------------------------
+    # Year conversion
+    # -----------------------------------------------------
+
+    df["Year"] = pd.to_numeric(
+        df["Year"],
+        errors="coerce"
     )
 
-    invalid_npi = df["Rndrng_NPI"].isna().sum()
-    invalid_year = df["Year"].isna().sum()
+    invalid_npi = int(
+        df["Rndrng_NPI"].isna().sum()
+    )
+
+    invalid_year = int(
+        df["Year"].isna().sum()
+    )
 
     print(
         "Invalid NPI values:",
@@ -155,6 +210,33 @@ def validate_input(df):
         "NPI + Year grain: PASSED"
     )
 
+    # -----------------------------------------------------
+    # Medical column validation
+    # -----------------------------------------------------
+
+    medical_columns = [
+        column
+        for column in df.columns
+        if column.startswith("Med_")
+    ]
+
+    print(
+        "Medical columns:",
+        medical_columns
+    )
+
+    if medical_columns:
+
+        raise ValueError(
+            "Medical component columns are still present."
+        )
+
+    print(
+        "Medical column validation: PASSED"
+    )
+
+    return df
+
 
 # =========================================================
 # SORT DATA
@@ -166,13 +248,15 @@ def sort_data(df):
     print("SORTING PROVIDER HISTORY")
     print("=" * 60)
 
-    df = df.sort_values(
-        [
-            "Rndrng_NPI",
-            "Year"
-        ]
-    ).reset_index(
-        drop=True
+    df = (
+        df
+        .sort_values(
+            [
+                "Rndrng_NPI",
+                "Year"
+            ]
+        )
+        .reset_index(drop=True)
     )
 
     print(
@@ -180,6 +264,28 @@ def sort_data(df):
     )
 
     return df
+
+
+# =========================================================
+# SAFE PERCENTAGE CHANGE
+# =========================================================
+
+def percentage_change(
+    current,
+    previous
+):
+
+    previous = previous.replace(
+        0,
+        np.nan
+    )
+
+    return (
+        (
+            current - previous
+        )
+        / previous
+    ) * 100
 
 
 # =========================================================
@@ -192,64 +298,75 @@ def create_yoy_features(df):
     print("CREATING YEAR-OVER-YEAR FEATURES")
     print("=" * 60)
 
+    group = df.groupby(
+        "Rndrng_NPI",
+        sort=False
+    )
+
     # -----------------------------------------------------
-    # Previous-year values
+    # Previous-year provider values
     # -----------------------------------------------------
 
     print(
         "\nCreating previous-year provider values..."
     )
 
-    group = df.groupby(
-        "Rndrng_NPI",
-        sort=False
+    df["previous_year"] = (
+        group["Year"]
+        .shift(1)
     )
 
-    df["previous_year"] = group["Year"].shift(1)
-
     df["previous_year_beneficiaries"] = (
-        group["Tot_Benes"].shift(1)
+        group["Tot_Benes"]
+        .shift(1)
     )
 
     df["previous_year_services"] = (
-        group["Tot_Srvcs"].shift(1)
+        group["Tot_Srvcs"]
+        .shift(1)
     )
 
     df["previous_year_payment"] = (
-        group["Tot_Mdcr_Pymt_Amt"].shift(1)
+        group["Tot_Mdcr_Pymt_Amt"]
+        .shift(1)
     )
 
     df["previous_year_allowed_amount"] = (
-        group["Tot_Mdcr_Alowd_Amt"].shift(1)
+        group["Tot_Mdcr_Alowd_Amt"]
+        .shift(1)
     )
 
     df["previous_year_payment_per_service"] = (
-        group["payment_per_service"].shift(1)
+        group["payment_per_service"]
+        .shift(1)
     )
 
     df["previous_year_services_per_beneficiary"] = (
-        group["services_per_beneficiary"].shift(1)
+        group["services_per_beneficiary"]
+        .shift(1)
     )
 
     df["previous_year_payment_per_beneficiary"] = (
-        group["payment_per_beneficiary"].shift(1)
+        group["payment_per_beneficiary"]
+        .shift(1)
     )
 
     df["previous_year_risk_score"] = (
-        group["beneficiary_risk_score"].shift(1)
+        group["beneficiary_risk_score"]
+        .shift(1)
     )
 
     df["previous_year_condition_burden"] = (
-        group["overall_condition_burden"].shift(1)
+        group["overall_condition_burden"]
+        .shift(1)
     )
 
     # -----------------------------------------------------
-    # Validate actual consecutive year
+    # Check actual consecutive calendar year
     # -----------------------------------------------------
 
     print(
-        "Checking whether previous observation is "
-        "actually the previous calendar year..."
+        "Checking consecutive calendar years..."
     )
 
     df["consecutive_year"] = (
@@ -262,18 +379,28 @@ def create_yoy_features(df):
         )
     )
 
-    # If provider has a gap, previous observation
-    # must not be treated as a true YoY comparison.
+    # -----------------------------------------------------
+    # Remove invalid previous-year comparisons
+    # -----------------------------------------------------
 
     comparison_columns = [
+
         "previous_year_beneficiaries",
+
         "previous_year_services",
+
         "previous_year_payment",
+
         "previous_year_allowed_amount",
+
         "previous_year_payment_per_service",
+
         "previous_year_services_per_beneficiary",
+
         "previous_year_payment_per_beneficiary",
+
         "previous_year_risk_score",
+
         "previous_year_condition_burden",
     ]
 
@@ -285,26 +412,7 @@ def create_yoy_features(df):
         ] = np.nan
 
     # -----------------------------------------------------
-    # Safe percentage change
-    # -----------------------------------------------------
-
-    def percentage_change(
-        current,
-        previous
-    ):
-
-        previous = previous.replace(
-            0,
-            np.nan
-        )
-
-        return (
-            (current - previous)
-            / previous
-        ) * 100
-
-    # -----------------------------------------------------
-    # YoY beneficiary change
+    # Beneficiary YoY
     # -----------------------------------------------------
 
     print(
@@ -319,7 +427,7 @@ def create_yoy_features(df):
     )
 
     # -----------------------------------------------------
-    # YoY service change
+    # Service YoY
     # -----------------------------------------------------
 
     print(
@@ -334,7 +442,7 @@ def create_yoy_features(df):
     )
 
     # -----------------------------------------------------
-    # YoY payment change
+    # Payment YoY
     # -----------------------------------------------------
 
     print(
@@ -349,7 +457,7 @@ def create_yoy_features(df):
     )
 
     # -----------------------------------------------------
-    # YoY allowed amount change
+    # Allowed amount YoY
     # -----------------------------------------------------
 
     print(
@@ -364,7 +472,7 @@ def create_yoy_features(df):
     )
 
     # -----------------------------------------------------
-    # YoY payment per service
+    # Payment per service YoY
     # -----------------------------------------------------
 
     print(
@@ -379,7 +487,7 @@ def create_yoy_features(df):
     )
 
     # -----------------------------------------------------
-    # YoY services per beneficiary
+    # Services per beneficiary YoY
     # -----------------------------------------------------
 
     print(
@@ -394,7 +502,7 @@ def create_yoy_features(df):
     )
 
     # -----------------------------------------------------
-    # YoY payment per beneficiary
+    # Payment per beneficiary YoY
     # -----------------------------------------------------
 
     print(
@@ -409,7 +517,7 @@ def create_yoy_features(df):
     )
 
     # -----------------------------------------------------
-    # YoY risk score change
+    # Risk score YoY
     # -----------------------------------------------------
 
     print(
@@ -424,7 +532,7 @@ def create_yoy_features(df):
     )
 
     # -----------------------------------------------------
-    # YoY condition burden change
+    # Condition burden YoY
     # -----------------------------------------------------
 
     print(
@@ -442,7 +550,7 @@ def create_yoy_features(df):
 
 
 # =========================================================
-# PROVIDER OBSERVATION FEATURES
+# PROVIDER HISTORY FEATURES
 # =========================================================
 
 def create_provider_history_features(df):
@@ -456,12 +564,24 @@ def create_provider_history_features(df):
     )
 
     # -----------------------------------------------------
-    # First and last observed year
+    # First observed year
     # -----------------------------------------------------
+
+    print(
+        "Creating provider first year..."
+    )
 
     df["provider_first_year"] = (
         group["Year"]
         .transform("min")
+    )
+
+    # -----------------------------------------------------
+    # Last observed year
+    # -----------------------------------------------------
+
+    print(
+        "Creating provider last year..."
     )
 
     df["provider_last_year"] = (
@@ -473,17 +593,39 @@ def create_provider_history_features(df):
     # Number of observed years
     # -----------------------------------------------------
 
+    print(
+        "Creating years observed..."
+    )
+
     df["provider_years_observed"] = (
         group["Year"]
         .transform("nunique")
     )
 
     # -----------------------------------------------------
-    # Provider history length
+    # Provider history span
     # -----------------------------------------------------
 
-    df["provider_history_span_years"] = (
+    print(
+        "Creating provider history span..."
+    )
+
+    df["provider_history_span"] = (
         df["provider_last_year"]
+        -
+        df["provider_first_year"]
+    )
+
+    # -----------------------------------------------------
+    # Current year index
+    # -----------------------------------------------------
+
+    print(
+        "Creating provider year index..."
+    )
+
+    df["provider_year_index"] = (
+        df["Year"]
         -
         df["provider_first_year"]
         +
@@ -491,185 +633,240 @@ def create_provider_history_features(df):
     )
 
     # -----------------------------------------------------
-    # Whether provider has complete 5-year history
+    # Provider has prior-year history
     # -----------------------------------------------------
-
-    df["complete_5_year_history"] = (
-        df["provider_years_observed"] == 5
-    )
-
-    # -----------------------------------------------------
-    # Whether current row is first observation
-    # -----------------------------------------------------
-
-    df["is_first_provider_year"] = (
-        df["Year"]
-        ==
-        df["provider_first_year"]
-    )
-
-    # -----------------------------------------------------
-    # Whether current row is last observation
-    # -----------------------------------------------------
-
-    df["is_last_provider_year"] = (
-        df["Year"]
-        ==
-        df["provider_last_year"]
-    )
 
     print(
-        "Provider history features created."
+        "Creating prior-history flag..."
     )
+
+    df["has_prior_year"] = (
+        df["previous_year"].notna()
+    ).astype(int)
 
     return df
 
 
 # =========================================================
-# LONG-TERM 2020-2024 CHANGE
+# ROLLING / TREND FEATURES
 # =========================================================
 
-def create_long_term_features(df):
+def create_trend_features(df):
 
     print("\n" + "=" * 60)
-    print("CREATING LONG-TERM PROVIDER TRENDS")
+    print("CREATING PROVIDER TREND FEATURES")
     print("=" * 60)
 
     group = df.groupby(
-        "Rndrng_NPI"
+        "Rndrng_NPI",
+        sort=False
     )
 
     # -----------------------------------------------------
-    # First observed values
+    # Previous 2-year values
     # -----------------------------------------------------
-
-    first_payment = group[
-        "Tot_Mdcr_Pymt_Amt"
-    ].transform("first")
-
-    first_services = group[
-        "Tot_Srvcs"
-    ].transform("first")
-
-    first_beneficiaries = group[
-        "Tot_Benes"
-    ].transform("first")
-
-    first_payment_per_service = group[
-        "payment_per_service"
-    ].transform("first")
-
-    first_risk = group[
-        "beneficiary_risk_score"
-    ].transform("first")
-
-    first_condition_burden = group[
-        "overall_condition_burden"
-    ].transform("first")
-
-    # -----------------------------------------------------
-    # Last observed values
-    # -----------------------------------------------------
-
-    last_payment = group[
-        "Tot_Mdcr_Pymt_Amt"
-    ].transform("last")
-
-    last_services = group[
-        "Tot_Srvcs"
-    ].transform("last")
-
-    last_beneficiaries = group[
-        "Tot_Benes"
-    ].transform("last")
-
-    last_payment_per_service = group[
-        "payment_per_service"
-    ].transform("last")
-
-    last_risk = group[
-        "beneficiary_risk_score"
-    ].transform("last")
-
-    last_condition_burden = group[
-        "overall_condition_burden"
-    ].transform("last")
-
-    # -----------------------------------------------------
-    # Safe percentage change
-    # -----------------------------------------------------
-
-    def pct_change(
-        current,
-        previous
-    ):
-
-        previous = previous.replace(
-            0,
-            np.nan
-        )
-
-        return (
-            (current - previous)
-            / previous
-        ) * 100
-
-    # -----------------------------------------------------
-    # Long-term changes
-    # -----------------------------------------------------
-
-    df["long_term_payment_change_pct"] = pct_change(
-        last_payment,
-        first_payment
-    )
-
-    df["long_term_service_change_pct"] = pct_change(
-        last_services,
-        first_services
-    )
-
-    df["long_term_beneficiary_change_pct"] = pct_change(
-        last_beneficiaries,
-        first_beneficiaries
-    )
-
-    df["long_term_payment_per_service_change_pct"] = (
-        pct_change(
-            last_payment_per_service,
-            first_payment_per_service
-        )
-    )
-
-    df["long_term_risk_score_change_pct"] = pct_change(
-        last_risk,
-        first_risk
-    )
-
-    df["long_term_condition_burden_change_pct"] = pct_change(
-        last_condition_burden,
-        first_condition_burden
-    )
 
     print(
-        "Long-term provider trends created."
+        "Creating two-year historical values..."
+    )
+
+    df["two_years_ago_beneficiaries"] = (
+        group["Tot_Benes"]
+        .shift(2)
+    )
+
+    df["two_years_ago_services"] = (
+        group["Tot_Srvcs"]
+        .shift(2)
+    )
+
+    df["two_years_ago_payment"] = (
+        group["Tot_Mdcr_Pymt_Amt"]
+        .shift(2)
+    )
+
+    # -----------------------------------------------------
+    # Validate two-year consecutive history
+    # -----------------------------------------------------
+
+    previous_year_2 = (
+        group["Year"]
+        .shift(2)
+    )
+
+    valid_two_year_history = (
+        previous_year_2.notna()
+        &
+        (
+            df["Year"]
+            ==
+            previous_year_2 + 2
+        )
+    )
+
+    for column in [
+        "two_years_ago_beneficiaries",
+        "two_years_ago_services",
+        "two_years_ago_payment",
+    ]:
+
+        df.loc[
+            ~valid_two_year_history,
+            column
+        ] = np.nan
+
+    # -----------------------------------------------------
+    # Two-year beneficiary growth
+    # -----------------------------------------------------
+
+    print(
+        "Creating two-year beneficiary growth..."
+    )
+
+    df["two_year_beneficiary_change_pct"] = (
+        percentage_change(
+            df["Tot_Benes"],
+            df["two_years_ago_beneficiaries"]
+        )
+    )
+
+    # -----------------------------------------------------
+    # Two-year service growth
+    # -----------------------------------------------------
+
+    print(
+        "Creating two-year service growth..."
+    )
+
+    df["two_year_service_change_pct"] = (
+        percentage_change(
+            df["Tot_Srvcs"],
+            df["two_years_ago_services"]
+        )
+    )
+
+    # -----------------------------------------------------
+    # Two-year payment growth
+    # -----------------------------------------------------
+
+    print(
+        "Creating two-year payment growth..."
+    )
+
+    df["two_year_payment_change_pct"] = (
+        percentage_change(
+            df["Tot_Mdcr_Pymt_Amt"],
+            df["two_years_ago_payment"]
+        )
+    )
+
+    # -----------------------------------------------------
+    # Provider cumulative observations
+    # -----------------------------------------------------
+
+    print(
+        "Creating cumulative provider observations..."
+    )
+
+    df["provider_observation_number"] = (
+        group.cumcount() + 1
+    )
+
+    # -----------------------------------------------------
+    # Cumulative average services
+    # -----------------------------------------------------
+
+    print(
+        "Creating historical average services..."
+    )
+
+    df["historical_avg_services"] = (
+        group["Tot_Srvcs"]
+        .transform(
+            lambda x:
+            x.expanding()
+            .mean()
+        )
+    )
+
+    # -----------------------------------------------------
+    # Cumulative average payment
+    # -----------------------------------------------------
+
+    print(
+        "Creating historical average payment..."
+    )
+
+    df["historical_avg_payment"] = (
+        group["Tot_Mdcr_Pymt_Amt"]
+        .transform(
+            lambda x:
+            x.expanding()
+            .mean()
+        )
+    )
+
+    # -----------------------------------------------------
+    # Current services vs historical average
+    # -----------------------------------------------------
+
+    print(
+        "Creating service trend ratio..."
+    )
+
+    df["services_vs_historical_avg_pct"] = (
+        percentage_change(
+            df["Tot_Srvcs"],
+            df["historical_avg_services"]
+        )
+    )
+
+    # -----------------------------------------------------
+    # Current payment vs historical average
+    # -----------------------------------------------------
+
+    print(
+        "Creating payment trend ratio..."
+    )
+
+    df["payment_vs_historical_avg_pct"] = (
+        percentage_change(
+            df["Tot_Mdcr_Pymt_Amt"],
+            df["historical_avg_payment"]
+        )
     )
 
     return df
 
 
 # =========================================================
-# TEMPORAL VALIDATION
+# FEATURE VALIDATION
 # =========================================================
 
-def validate_temporal_features(df):
+def validate_features(df):
 
     print("\n" + "=" * 60)
-    print("STAGE 3 TEMPORAL VALIDATION")
+    print("STAGE 3 FEATURE VALIDATION")
     print("=" * 60)
 
     expected_features = [
+
+        # Previous-year features
         "previous_year",
+        "previous_year_beneficiaries",
+        "previous_year_services",
+        "previous_year_payment",
+        "previous_year_allowed_amount",
+        "previous_year_payment_per_service",
+        "previous_year_services_per_beneficiary",
+        "previous_year_payment_per_beneficiary",
+        "previous_year_risk_score",
+        "previous_year_condition_burden",
+
+        # Calendar validation
         "consecutive_year",
+
+        # YoY features
         "yoy_beneficiary_change_pct",
         "yoy_service_change_pct",
         "yoy_payment_change_pct",
@@ -679,24 +876,30 @@ def validate_temporal_features(df):
         "yoy_payment_per_beneficiary_change_pct",
         "yoy_risk_score_change_pct",
         "yoy_condition_burden_change_pct",
+
+        # Provider history
         "provider_first_year",
         "provider_last_year",
         "provider_years_observed",
-        "provider_history_span_years",
-        "complete_5_year_history",
-        "is_first_provider_year",
-        "is_last_provider_year",
-        "long_term_payment_change_pct",
-        "long_term_service_change_pct",
-        "long_term_beneficiary_change_pct",
-        "long_term_payment_per_service_change_pct",
-        "long_term_risk_score_change_pct",
-        "long_term_condition_burden_change_pct",
-    ]
+        "provider_history_span",
+        "provider_year_index",
+        "has_prior_year",
 
-    # -----------------------------------------------------
-    # Check feature existence
-    # -----------------------------------------------------
+        # Two-year history
+        "two_years_ago_beneficiaries",
+        "two_years_ago_services",
+        "two_years_ago_payment",
+        "two_year_beneficiary_change_pct",
+        "two_year_service_change_pct",
+        "two_year_payment_change_pct",
+
+        # Historical trend
+        "provider_observation_number",
+        "historical_avg_services",
+        "historical_avg_payment",
+        "services_vs_historical_avg_pct",
+        "payment_vs_historical_avg_pct",
+    ]
 
     missing = [
         column
@@ -706,83 +909,35 @@ def validate_temporal_features(df):
 
     if missing:
 
-        raise ValueError(
-            f"Missing temporal features: {missing}"
+        print(
+            "Missing Stage 3 features:"
         )
 
-    print(
-        "Expected temporal features: PASSED"
-    )
-
-    # -----------------------------------------------------
-    # Grain validation
-    # -----------------------------------------------------
-
-    duplicate_count = df.duplicated(
-        subset=[
-            "Rndrng_NPI",
-            "Year"
-        ]
-    ).sum()
-
-    print(
-        "Duplicate NPI-Year rows:",
-        f"{duplicate_count:,}"
-    )
-
-    if duplicate_count != 0:
+        for column in missing:
+            print(
+                f"- {column}"
+            )
 
         raise ValueError(
-            "NPI + Year grain changed."
+            "Stage 3 feature validation failed."
         )
 
     print(
-        "NPI + Year grain: PASSED"
-    )
-
-    # -----------------------------------------------------
-    # Consecutive-year validation
-    # -----------------------------------------------------
-
-    invalid_comparisons = (
-        (~df["consecutive_year"])
-        &
-        (
-            df[
-                "yoy_payment_change_pct"
-            ].notna()
-        )
-    ).sum()
-
-    print(
-        "Invalid YoY comparisons:",
-        f"{invalid_comparisons:,}"
-    )
-
-    if invalid_comparisons != 0:
-
-        raise ValueError(
-            "Non-consecutive years were used for YoY calculations."
-        )
-
-    print(
-        "Consecutive-year validation: PASSED"
+        "All expected temporal features exist: PASSED"
     )
 
     # -----------------------------------------------------
     # Infinite values
     # -----------------------------------------------------
 
+    infinite_count = 0
+
     numeric_features = [
         column
         for column in expected_features
         if column != "consecutive_year"
-        and column != "complete_5_year_history"
-        and column != "is_first_provider_year"
-        and column != "is_last_provider_year"
+        and column != "has_prior_year"
     ]
-
-    infinite_count = 0
 
     for column in numeric_features:
 
@@ -798,13 +953,13 @@ def validate_temporal_features(df):
 
     print(
         "Infinite values:",
-        infinite_count
+        f"{infinite_count:,}"
     )
 
     if infinite_count != 0:
 
         raise ValueError(
-            "Infinite values detected."
+            "Infinite values detected in Stage 3."
         )
 
     print(
@@ -812,42 +967,100 @@ def validate_temporal_features(df):
     )
 
     # -----------------------------------------------------
-    # Temporal summary
+    # Medical columns
     # -----------------------------------------------------
 
-    print("\nProvider history summary:")
+    medical_columns = [
+        column
+        for column in df.columns
+        if column.startswith("Med_")
+    ]
 
     print(
-        "Unique providers:",
-        f"{df['Rndrng_NPI'].nunique():,}"
+        "Medical columns:",
+        medical_columns
+    )
+
+    if medical_columns:
+
+        raise ValueError(
+            "Medical columns detected in Stage 3."
+        )
+
+    print(
+        "Medical column exclusion: PASSED"
+    )
+
+    # -----------------------------------------------------
+    # Grain
+    # -----------------------------------------------------
+
+    duplicate_count = df.duplicated(
+        subset=[
+            "Rndrng_NPI",
+            "Year"
+        ]
+    ).sum()
+
+    print(
+        "Duplicate NPI-Year:",
+        f"{duplicate_count:,}"
+    )
+
+    if duplicate_count != 0:
+
+        raise ValueError(
+            "NPI + Year uniqueness failed."
+        )
+
+    print(
+        "NPI + Year uniqueness: PASSED"
+    )
+
+    # -----------------------------------------------------
+    # Year coverage
+    # -----------------------------------------------------
+
+    years = sorted(
+        df["Year"]
+        .dropna()
+        .unique()
+        .tolist()
     )
 
     print(
-        "Providers with complete 5-year history:",
-        f"{df.loc[df['complete_5_year_history'], 'Rndrng_NPI'].nunique():,}"
+        "Years:",
+        years
     )
 
-    print(
-        "Providers with less than 5 years:",
-        f"{df.loc[~df['complete_5_year_history'], 'Rndrng_NPI'].nunique():,}"
-    )
+    # -----------------------------------------------------
+    # Summary
+    # -----------------------------------------------------
+
+    print("\n" + "=" * 60)
+    print("TEMPORAL FEATURE SUMMARY")
+    print("=" * 60)
 
     print(
-        "\nYoY comparison rows:",
-        f"{df['consecutive_year'].sum():,}"
+        "Temporal features created:",
+        len(expected_features)
     )
 
-    print(
-        "Rows without valid previous year:",
-        f"{(~df['consecutive_year']).sum():,}"
-    )
+    for feature in expected_features:
+        print(
+            f"- {feature}"
+        )
 
 
 # =========================================================
-# SAVE
+# SAVE DATASET
 # =========================================================
 
-def save_features(df):
+def save_dataset(df):
+
+    print("\n" + "=" * 60)
+    print("SAVING STAGE 3 DATASET")
+    print("=" * 60)
 
     OUTPUT_PATH.parent.mkdir(
         parents=True,
@@ -858,10 +1071,6 @@ def save_features(df):
         OUTPUT_PATH,
         index=False
     )
-
-    print("\n" + "=" * 60)
-    print("STAGE 3 DATASET SAVED")
-    print("=" * 60)
 
     print(
         "Output path:",
@@ -875,43 +1084,94 @@ def save_features(df):
 
     print(
         "Columns:",
-        f"{len(df.columns):,}"
+        len(df.columns)
+    )
+
+    medical_columns = [
+        column
+        for column in df.columns
+        if column.startswith("Med_")
+    ]
+
+    print(
+        "Medical columns:",
+        medical_columns
     )
 
 
 # =========================================================
-# MAIN
+# MAIN PIPELINE
 # =========================================================
 
 def main():
 
+    # -----------------------------------------------------
+    # 1. Load Stage 2
+    # -----------------------------------------------------
+
     df = load_stage2_data()
 
-    validate_input(
+    # -----------------------------------------------------
+    # 2. Remove medical components defensively
+    # -----------------------------------------------------
+
+    df = exclude_medical_columns(
         df
     )
+
+    # -----------------------------------------------------
+    # 3. Validate
+    # -----------------------------------------------------
+
+    df = validate_input(
+        df
+    )
+
+    # -----------------------------------------------------
+    # 4. Sort provider history
+    # -----------------------------------------------------
 
     df = sort_data(
         df
     )
 
+    # -----------------------------------------------------
+    # 5. Create YoY features
+    # -----------------------------------------------------
+
     df = create_yoy_features(
         df
     )
+
+    # -----------------------------------------------------
+    # 6. Create provider history features
+    # -----------------------------------------------------
 
     df = create_provider_history_features(
         df
     )
 
-    df = create_long_term_features(
+    # -----------------------------------------------------
+    # 7. Create trend features
+    # -----------------------------------------------------
+
+    df = create_trend_features(
         df
     )
 
-    validate_temporal_features(
+    # -----------------------------------------------------
+    # 8. Validate final Stage 3
+    # -----------------------------------------------------
+
+    validate_features(
         df
     )
 
-    save_features(
+    # -----------------------------------------------------
+    # 9. Save
+    # -----------------------------------------------------
+
+    save_dataset(
         df
     )
 
@@ -919,6 +1179,10 @@ def main():
     print("STAGE 3 COMPLETED SUCCESSFULLY")
     print("=" * 60)
 
+
+# =========================================================
+# ENTRY POINT
+# =========================================================
 
 if __name__ == "__main__":
     main()

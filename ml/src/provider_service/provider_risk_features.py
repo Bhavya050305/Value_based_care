@@ -18,6 +18,27 @@ OUTPUT_PATH = Path(
 
 
 # =========================================================
+# MEDICAL COMPONENT COLUMNS
+# =========================================================
+#
+# These medical component columns were found to be unreliable
+# for the provider-service analytics pipeline.
+#
+# They must NOT be carried into Stage 2 or downstream stages.
+# =========================================================
+
+MEDICAL_COLUMNS = [
+    "Med_Tot_HCPCS_Cds",
+    "Med_Tot_Benes",
+    "Med_Tot_Srvcs",
+    "Med_Sbmtd_Chrg",
+    "Med_Mdcr_Alowd_Amt",
+    "Med_Mdcr_Pymt_Amt",
+    "Med_Mdcr_Stdzd_Amt",
+]
+
+
+# =========================================================
 # LOAD STAGE 1 DATA
 # =========================================================
 
@@ -47,6 +68,69 @@ def load_stage1_data():
 
     print(
         f"Columns loaded: {len(df.columns):,}"
+    )
+
+    # -----------------------------------------------------
+    # MEDICAL COMPONENT EXCLUSION
+    # -----------------------------------------------------
+
+    print("\n" + "=" * 60)
+    print("EXCLUDING UNRELIABLE MEDICAL COMPONENT COLUMNS")
+    print("=" * 60)
+
+    medical_columns_found = [
+        column
+        for column in MEDICAL_COLUMNS
+        if column in df.columns
+    ]
+
+    print(
+        "Medical columns found:",
+        len(medical_columns_found)
+    )
+
+    if medical_columns_found:
+
+        for column in medical_columns_found:
+
+            print(
+                f"  Removing: {column}"
+            )
+
+        df = df.drop(
+            columns=medical_columns_found
+        )
+
+    else:
+
+        print(
+            "No medical component columns found."
+        )
+
+    print(
+        "Columns after exclusion:",
+        len(df.columns)
+    )
+
+    # -----------------------------------------------------
+    # HARD VALIDATION
+    # -----------------------------------------------------
+
+    remaining_medical_columns = [
+        column
+        for column in df.columns
+        if column.startswith("Med_")
+    ]
+
+    if remaining_medical_columns:
+
+        raise ValueError(
+            "Medical component exclusion FAILED. "
+            f"Remaining columns: {remaining_medical_columns}"
+        )
+
+    print(
+        "Medical component exclusion: PASSED"
     )
 
     return df
@@ -84,6 +168,10 @@ def validate_input(df):
         "Required columns: PASSED"
     )
 
+    # -----------------------------------------------------
+    # NPI + YEAR GRAIN
+    # -----------------------------------------------------
+
     duplicate_count = df.duplicated(
         subset=[
             "Rndrng_NPI",
@@ -104,6 +192,32 @@ def validate_input(df):
 
     print(
         "NPI + Year grain: PASSED"
+    )
+
+    # -----------------------------------------------------
+    # MEDICAL COLUMN VALIDATION
+    # -----------------------------------------------------
+
+    medical_columns = [
+        column
+        for column in df.columns
+        if column.startswith("Med_")
+    ]
+
+    print(
+        "Medical columns:",
+        medical_columns
+    )
+
+    if medical_columns:
+
+        raise ValueError(
+            "Medical columns detected during input validation: "
+            f"{medical_columns}"
+        )
+
+    print(
+        "Medical column validation: PASSED"
     )
 
 
@@ -135,7 +249,10 @@ def identify_condition_columns(df):
     )
 
     for column in behavioral_columns:
-        print(f"- {column}")
+
+        print(
+            f"- {column}"
+        )
 
     print(
         "\nPhysical-health columns:",
@@ -143,19 +260,27 @@ def identify_condition_columns(df):
     )
 
     for column in physical_columns:
-        print(f"- {column}")
+
+        print(
+            f"- {column}"
+        )
 
     if not behavioral_columns:
+
         raise ValueError(
             "No behavioral-health condition columns found."
         )
 
     if not physical_columns:
+
         raise ValueError(
             "No physical-health condition columns found."
         )
 
-    return behavioral_columns, physical_columns
+    return (
+        behavioral_columns,
+        physical_columns
+    )
 
 
 # =========================================================
@@ -361,6 +486,10 @@ def validate_features(df):
         "average_risk_score"
     ]
 
+    # -----------------------------------------------------
+    # Expected features
+    # -----------------------------------------------------
+
     missing = [
         column
         for column in expected_features
@@ -378,6 +507,32 @@ def validate_features(df):
     )
 
     # -----------------------------------------------------
+    # Medical columns
+    # -----------------------------------------------------
+
+    medical_columns = [
+        column
+        for column in df.columns
+        if column.startswith("Med_")
+    ]
+
+    print(
+        "Medical columns in Stage 2:",
+        medical_columns
+    )
+
+    if medical_columns:
+
+        raise ValueError(
+            "Medical component exclusion FAILED: "
+            f"{medical_columns}"
+        )
+
+    print(
+        "Medical component exclusion: PASSED"
+    )
+
+    # -----------------------------------------------------
     # Infinite values
     # -----------------------------------------------------
 
@@ -391,8 +546,7 @@ def validate_features(df):
         )
 
         infinite_count += int(
-            np.isinf(values)
-            .sum()
+            np.isinf(values).sum()
         )
 
     print(
@@ -419,7 +573,8 @@ def validate_features(df):
     print(
         df[
             expected_features
-        ].describe()
+        ]
+        .describe()
         .round(3)
         .to_string()
     )
@@ -430,6 +585,23 @@ def validate_features(df):
 # =========================================================
 
 def save_features(df):
+
+    # -----------------------------------------------------
+    # FINAL SAFETY CHECK BEFORE WRITING FILE
+    # -----------------------------------------------------
+
+    medical_columns = [
+        column
+        for column in df.columns
+        if column.startswith("Med_")
+    ]
+
+    if medical_columns:
+
+        raise ValueError(
+            "REFUSING TO SAVE Stage 2 dataset because "
+            f"medical columns are present: {medical_columns}"
+        )
 
     OUTPUT_PATH.parent.mkdir(
         parents=True,
@@ -458,6 +630,11 @@ def save_features(df):
     print(
         "Columns:",
         f"{len(df.columns):,}"
+    )
+
+    print(
+        "Medical columns:",
+        []
     )
 
 

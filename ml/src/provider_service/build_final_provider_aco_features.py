@@ -8,12 +8,12 @@ import pandas as pd
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
-BASE_FILE = (
+STAGE4_FILE = (
     PROJECT_ROOT
     / "data"
     / "processed"
     / "provider_service"
-    / "provider_aco_features.csv"
+    / "provider_features_stage4.csv"
 )
 
 PERFORMANCE_FILE = (
@@ -32,6 +32,14 @@ LONGITUDINAL_FILE = (
     / "provider_longitudinal_profile.csv"
 )
 
+ACO_MAPPING_FILE = (
+    PROJECT_ROOT
+    / "data"
+    / "processed"
+    / "all_aco"
+    / "aco_provider_mapping.csv"
+)
+
 OUTPUT_FILE = (
     PROJECT_ROOT
     / "data"
@@ -46,9 +54,10 @@ OUTPUT_FILE = (
 # ============================================================
 
 def print_section(title):
-    print("\n" + "-" * 90)
+
+    print("\n" + "=" * 90)
     print(title)
-    print("-" * 90)
+    print("=" * 90)
 
 
 # ============================================================
@@ -62,8 +71,8 @@ print("=" * 90)
 print("\nProject root:")
 print(PROJECT_ROOT)
 
-print("\nBase dataset:")
-print(BASE_FILE)
+print("\nStage 4 dataset:")
+print(STAGE4_FILE)
 
 print("\nPerformance dataset:")
 print(PERFORMANCE_FILE)
@@ -71,22 +80,30 @@ print(PERFORMANCE_FILE)
 print("\nLongitudinal dataset:")
 print(LONGITUDINAL_FILE)
 
-print("\nOutput dataset:")
+print("\nACO mapping:")
+print(ACO_MAPPING_FILE)
+
+print("\nOutput:")
 print(OUTPUT_FILE)
 
 
 # ============================================================
-# CHECK FILES
+# CHECK INPUT FILES
 # ============================================================
 
 print_section("CHECKING INPUT FILES")
 
-for file_path in [
-    BASE_FILE,
+required_files = [
+    STAGE4_FILE,
     PERFORMANCE_FILE,
     LONGITUDINAL_FILE,
-]:
+    ACO_MAPPING_FILE,
+]
+
+for file_path in required_files:
+
     if not file_path.exists():
+
         raise FileNotFoundError(
             f"\nRequired file not found:\n{file_path}"
         )
@@ -95,115 +112,156 @@ for file_path in [
 
 
 # ============================================================
-# LOAD BASE DATA
+# LOAD STAGE 4
 # ============================================================
 
-print_section("LOADING BASE PROVIDER + ACO DATASET")
+print_section("LOADING STAGE 4 PROVIDER FEATURES")
 
-base = pd.read_csv(
-    BASE_FILE,
+stage4 = pd.read_csv(
+    STAGE4_FILE,
     low_memory=False
 )
 
-print(f"Rows loaded: {len(base):,}")
-print(f"Columns loaded: {len(base.columns):,}")
+print(
+    f"Rows loaded: {len(stage4):,}"
+)
+
+print(
+    f"Columns loaded: {len(stage4.columns):,}"
+)
 
 
 # ============================================================
-# LOAD PERFORMANCE DATA
+# LOAD PERFORMANCE
 # ============================================================
 
-print_section("LOADING PROVIDER PERFORMANCE DATASET")
+print_section("LOADING PROVIDER PERFORMANCE FEATURES")
 
 performance = pd.read_csv(
     PERFORMANCE_FILE,
     low_memory=False
 )
 
-print(f"Rows loaded: {len(performance):,}")
-print(f"Columns loaded: {len(performance.columns):,}")
+print(
+    f"Rows loaded: {len(performance):,}"
+)
+
+print(
+    f"Columns loaded: {len(performance.columns):,}"
+)
 
 
 # ============================================================
-# LOAD LONGITUDINAL DATA
+# LOAD LONGITUDINAL
 # ============================================================
 
-print_section("LOADING PROVIDER LONGITUDINAL DATASET")
+print_section("LOADING PROVIDER LONGITUDINAL FEATURES")
 
 longitudinal = pd.read_csv(
     LONGITUDINAL_FILE,
     low_memory=False
 )
 
-print(f"Rows loaded: {len(longitudinal):,}")
-print(f"Columns loaded: {len(longitudinal.columns):,}")
+print(
+    f"Rows loaded: {len(longitudinal):,}"
+)
+
+print(
+    f"Columns loaded: {len(longitudinal.columns):,}"
+)
 
 
 # ============================================================
-# REQUIRED KEY CHECK
+# LOAD ACO MAPPING
 # ============================================================
 
-print_section("CHECKING REQUIRED KEY COLUMNS")
+print_section("LOADING ACO PROVIDER MAPPING")
 
-base_required = [
-    "Rndrng_NPI",
-    "Year",
-    "ACO_ID",
-]
+aco_mapping = pd.read_csv(
+    ACO_MAPPING_FILE,
+    low_memory=False
+)
 
-performance_required = [
-    "Rndrng_NPI",
-    "Year",
-    "utilization_score",
-    "cost_score",
-    "provider_segment",
-]
+print(
+    f"Rows loaded: {len(aco_mapping):,}"
+)
 
-longitudinal_required = [
-    "Rndrng_NPI",
-    "years_observed",
-    "first_year",
-    "last_year",
-    "dominant_provider_segment",
-    "segment_year_count",
-    "segment_stability",
-    "overall_provider_segment",
-    "history_class",
-]
+print(
+    f"Columns loaded: {len(aco_mapping.columns):,}"
+)
 
 
-def check_columns(df, required, name):
+# ============================================================
+# REQUIRED COLUMN VALIDATION
+# ============================================================
+
+print_section("VALIDATING REQUIRED COLUMNS")
+
+
+def check_columns(df, required, dataset_name):
 
     missing = [
-        col for col in required
-        if col not in df.columns
+        column
+        for column in required
+        if column not in df.columns
     ]
 
     if missing:
+
         raise ValueError(
-            f"\n{name} is missing required columns:\n"
+            f"\n{dataset_name} is missing required columns:\n"
             + "\n".join(missing)
         )
 
-    print(f"✓ {name} contains all required columns.")
+    print(
+        f"✓ {dataset_name}: required columns present"
+    )
 
 
 check_columns(
-    base,
-    base_required,
-    "Base dataset"
+    stage4,
+    [
+        "Rndrng_NPI",
+        "Year",
+    ],
+    "Stage 4"
 )
+
 
 check_columns(
     performance,
-    performance_required,
-    "Performance dataset"
+    [
+        "Rndrng_NPI",
+        "Year",
+        "utilization_score",
+        "cost_score",
+        "provider_segment",
+    ],
+    "Performance"
 )
+
 
 check_columns(
     longitudinal,
-    longitudinal_required,
-    "Longitudinal dataset"
+    [
+        "Rndrng_NPI",
+        "dominant_provider_segment",
+        "segment_year_count",
+        "segment_stability",
+        "overall_provider_segment",
+        "history_class",
+    ],
+    "Longitudinal"
+)
+
+
+check_columns(
+    aco_mapping,
+    [
+        "ACO_ID",
+        "Rndrng_NPI",
+    ],
+    "ACO Mapping"
 )
 
 
@@ -216,22 +274,18 @@ print_section("STANDARDIZING NPI VALUES")
 
 def standardize_npi(df):
 
-    df["Rndrng_NPI"] = (
-        pd.to_numeric(
-            df["Rndrng_NPI"],
-            errors="coerce"
-        )
-        .astype("Int64")
-    )
+    df["Rndrng_NPI"] = pd.to_numeric(
+        df["Rndrng_NPI"],
+        errors="coerce"
+    ).astype("Int64")
 
     return df
 
 
-base = standardize_npi(base)
+stage4 = standardize_npi(stage4)
 performance = standardize_npi(performance)
 longitudinal = standardize_npi(longitudinal)
-
-print("✓ NPI values standardized.")
+aco_mapping = standardize_npi(aco_mapping)
 
 
 # ============================================================
@@ -240,8 +294,8 @@ print("✓ NPI values standardized.")
 
 print_section("STANDARDIZING YEAR VALUES")
 
-base["Year"] = pd.to_numeric(
-    base["Year"],
+stage4["Year"] = pd.to_numeric(
+    stage4["Year"],
     errors="coerce"
 ).astype("Int64")
 
@@ -254,184 +308,232 @@ print("✓ Year values standardized.")
 
 
 # ============================================================
-# CHECK BASE GRAIN
+# BASIC VALIDATION
 # ============================================================
 
-print_section("VALIDATING BASE DATASET GRAIN")
+print_section("VALIDATING STAGE 4 GRAIN")
 
-base_duplicates = base.duplicated(
-    subset=["Rndrng_NPI", "Year"]
+stage4_duplicates = stage4.duplicated(
+    subset=[
+        "Rndrng_NPI",
+        "Year",
+    ]
 ).sum()
 
 print(
-    f"Duplicate NPI-Year rows: {base_duplicates:,}"
+    f"Duplicate NPI-Year rows: "
+    f"{stage4_duplicates:,}"
 )
 
-if base_duplicates != 0:
+if stage4_duplicates != 0:
+
     raise ValueError(
-        "Base dataset does not have unique NPI-Year grain."
+        "Stage 4 does not have unique NPI-Year grain."
     )
 
-print("✓ Base dataset has unique NPI-Year grain.")
+print("✓ Stage 4 NPI-Year grain passed.")
 
 
 # ============================================================
-# CHECK PERFORMANCE GRAIN
+# PERFORMANCE GRAIN
 # ============================================================
 
-print_section("VALIDATING PERFORMANCE DATASET GRAIN")
+print_section("VALIDATING PERFORMANCE GRAIN")
 
 performance_duplicates = performance.duplicated(
-    subset=["Rndrng_NPI", "Year"]
+    subset=[
+        "Rndrng_NPI",
+        "Year",
+    ]
 ).sum()
 
 print(
-    f"Duplicate NPI-Year rows: {performance_duplicates:,}"
+    f"Duplicate NPI-Year rows: "
+    f"{performance_duplicates:,}"
 )
 
 if performance_duplicates != 0:
+
     raise ValueError(
         "Performance dataset contains duplicate NPI-Year rows."
     )
 
-print("✓ Performance dataset has unique NPI-Year grain.")
+print("✓ Performance NPI-Year grain passed.")
 
 
 # ============================================================
-# CHECK LONGITUDINAL GRAIN
+# LONGITUDINAL GRAIN
 # ============================================================
 
-print_section("VALIDATING LONGITUDINAL DATASET GRAIN")
+print_section("VALIDATING LONGITUDINAL GRAIN")
 
 longitudinal_duplicates = longitudinal.duplicated(
     subset=["Rndrng_NPI"]
 ).sum()
 
 print(
-    f"Duplicate NPI rows: {longitudinal_duplicates:,}"
+    f"Duplicate NPI rows: "
+    f"{longitudinal_duplicates:,}"
 )
 
 if longitudinal_duplicates != 0:
+
     raise ValueError(
-        "Longitudinal dataset contains duplicate NPIs."
+        "Longitudinal dataset must contain one row per NPI."
     )
 
-print("✓ Longitudinal dataset has one row per NPI.")
+print("✓ Longitudinal one-row-per-NPI grain passed.")
 
 
 # ============================================================
-# CHECK NPI COVERAGE
+# ACO MAPPING GRAIN
 # ============================================================
 
-print_section("CHECKING PERFORMANCE COVERAGE")
+print_section("VALIDATING ACO MAPPING")
 
-base_npis = set(
-    base["Rndrng_NPI"].dropna().unique()
-)
-
-performance_npis = set(
-    performance["Rndrng_NPI"].dropna().unique()
-)
-
-missing_performance_npis = (
-    base_npis - performance_npis
-)
-
-extra_performance_npis = (
-    performance_npis - base_npis
-)
+aco_duplicates = aco_mapping.duplicated(
+    subset=["Rndrng_NPI"]
+).sum()
 
 print(
-    f"Base unique NPIs:              {len(base_npis):,}"
+    f"Duplicate provider mappings: "
+    f"{aco_duplicates:,}"
 )
 
-print(
-    f"Performance unique NPIs:       {len(performance_npis):,}"
-)
+if aco_duplicates != 0:
 
-print(
-    f"Base NPIs without performance: {len(missing_performance_npis):,}"
-)
-
-print(
-    f"Extra performance NPIs:        {len(extra_performance_npis):,}"
-)
-
-
-# ============================================================
-# CHECK PERFORMANCE NPI-YEAR COVERAGE
-# ============================================================
-
-base_keys = set(
-    zip(
-        base["Rndrng_NPI"],
-        base["Year"]
+    raise ValueError(
+        "ACO mapping contains multiple ACO assignments "
+        "for the same NPI."
     )
+
+print("✓ One ACO assignment per provider.")
+
+
+# ============================================================
+# ACO COVERAGE
+# ============================================================
+
+stage4_npis = set(
+    stage4["Rndrng_NPI"]
+    .dropna()
+    .unique()
 )
 
-performance_keys = set(
-    zip(
-        performance["Rndrng_NPI"],
-        performance["Year"]
+aco_npis = set(
+    aco_mapping["Rndrng_NPI"]
+    .dropna()
+    .unique()
+)
+
+missing_aco_npis = stage4_npis - aco_npis
+
+print(
+    f"\nStage 4 unique providers: "
+    f"{len(stage4_npis):,}"
+)
+
+print(
+    f"Mapped providers: "
+    f"{len(aco_npis):,}"
+)
+
+print(
+    f"Stage 4 providers without ACO: "
+    f"{len(missing_aco_npis):,}"
+)
+
+if missing_aco_npis:
+
+    print(
+        "\nWARNING: Some providers do not have an ACO mapping."
     )
-)
 
-missing_performance_keys = (
-    base_keys - performance_keys
+else:
+
+    print(
+        "✓ All Stage 4 providers have an ACO mapping."
+    )
+
+
+# ============================================================
+# SELECT ACO COLUMNS
+# ============================================================
+
+print_section("PREPARING ACO MAPPING")
+
+aco_selected = aco_mapping[
+    [
+        "Rndrng_NPI",
+        "ACO_ID",
+        "provider_name",
+        "mapping_type",
+        "mapping_seed",
+    ]
+].copy()
+
+print(
+    f"ACO mapping columns: "
+    f"{len(aco_selected.columns)}"
 )
 
 print(
-    f"\nBase NPI-Year combinations: "
-    f"{len(base_keys):,}"
-)
-
-print(
-    f"Performance NPI-Year combinations: "
-    f"{len(performance_keys):,}"
-)
-
-print(
-    f"Base NPI-Year without performance: "
-    f"{len(missing_performance_keys):,}"
+    f"Unique ACOs: "
+    f"{aco_selected['ACO_ID'].nunique():,}"
 )
 
 
 # ============================================================
-# CHECK LONGITUDINAL COVERAGE
+# MERGE ACO
 # ============================================================
 
-print_section("CHECKING LONGITUDINAL COVERAGE")
+print_section("MERGING ACO ASSIGNMENTS")
 
-longitudinal_npis = set(
-    longitudinal["Rndrng_NPI"].dropna().unique()
-)
+original_rows = len(stage4)
 
-missing_longitudinal_npis = (
-    base_npis - longitudinal_npis
-)
-
-extra_longitudinal_npis = (
-    longitudinal_npis - base_npis
+final_df = stage4.merge(
+    aco_selected,
+    on="Rndrng_NPI",
+    how="left",
+    validate="many_to_one",
 )
 
 print(
-    f"Longitudinal unique NPIs:       "
-    f"{len(longitudinal_npis):,}"
+    f"Rows after ACO merge: "
+    f"{len(final_df):,}"
 )
 
-print(
-    f"Base NPIs without longitudinal: "
-    f"{len(missing_longitudinal_npis):,}"
-)
+if len(final_df) != original_rows:
 
-print(
-    f"Extra longitudinal NPIs:        "
-    f"{len(extra_longitudinal_npis):,}"
-)
+    raise ValueError(
+        "ACO merge changed the Stage 4 row count."
+    )
+
+print("✓ Row count preserved.")
 
 
 # ============================================================
-# SELECT PERFORMANCE COLUMNS
+# ACO VALIDATION
+# ============================================================
+
+missing_aco = final_df["ACO_ID"].isna().sum()
+
+print(
+    f"Missing ACO_ID: "
+    f"{missing_aco:,}"
+)
+
+if missing_aco != 0:
+
+    raise ValueError(
+        "Some provider-year records have no ACO_ID."
+    )
+
+print("✓ ACO coverage passed.")
+
+
+# ============================================================
+# SELECT PERFORMANCE FEATURES
 # ============================================================
 
 print_section("SELECTING PERFORMANCE FEATURES")
@@ -458,29 +560,105 @@ performance_columns = [
     "low_cost_flag",
 ]
 
+missing_performance_columns = [
+    col
+    for col in performance_columns
+    if col not in performance.columns
+]
+
+if missing_performance_columns:
+
+    raise ValueError(
+        "Missing performance columns:\n"
+        + "\n".join(missing_performance_columns)
+    )
+
 performance_selected = performance[
     performance_columns
 ].copy()
 
 print(
     f"Performance features selected: "
-    f"{len(performance_selected.columns) - 2}"
+    f"{len(performance_columns) - 2}"
 )
 
 
 # ============================================================
-# SELECT LONGITUDINAL COLUMNS
+# MERGE PERFORMANCE
+# ============================================================
+
+print_section("MERGING PERFORMANCE FEATURES")
+
+performance_merge_columns = set(
+    performance_selected.columns
+) - {
+    "Rndrng_NPI",
+    "Year",
+}
+
+collisions = (
+    set(final_df.columns)
+    & performance_merge_columns
+)
+
+if collisions:
+
+    raise ValueError(
+        f"Performance column collisions detected: "
+        f"{sorted(collisions)}"
+    )
+
+final_df = final_df.merge(
+    performance_selected,
+    on=[
+        "Rndrng_NPI",
+        "Year",
+    ],
+    how="left",
+    validate="one_to_one",
+)
+
+if len(final_df) != original_rows:
+
+    raise ValueError(
+        "Performance merge changed row count."
+    )
+
+print("✓ Performance merge completed.")
+print("✓ Row count preserved.")
+
+
+# ============================================================
+# PERFORMANCE COVERAGE
+# ============================================================
+
+print("\nPerformance coverage:")
+
+for column in [
+    "utilization_score",
+    "cost_score",
+    "provider_segment",
+]:
+
+    missing = final_df[column].isna().sum()
+
+    print(
+        f"- {column}: "
+        f"{missing:,} missing"
+    )
+
+
+# ============================================================
+# SELECT LONGITUDINAL FEATURES
 # ============================================================
 
 print_section("SELECTING LONGITUDINAL FEATURES")
 
 longitudinal_columns = [
     "Rndrng_NPI",
-
     "years_observed",
     "first_year",
     "last_year",
-
     "dominant_provider_segment",
     "segment_year_count",
     "segment_stability",
@@ -488,21 +666,22 @@ longitudinal_columns = [
     "history_class",
 ]
 
+missing_longitudinal_columns = [
+    col
+    for col in longitudinal_columns
+    if col not in longitudinal.columns
+]
+
+if missing_longitudinal_columns:
+
+    raise ValueError(
+        "Missing longitudinal columns:\n"
+        + "\n".join(missing_longitudinal_columns)
+    )
+
 longitudinal_selected = longitudinal[
     longitudinal_columns
 ].copy()
-
-print(
-    f"Longitudinal features selected: "
-    f"{len(longitudinal_selected.columns) - 1}"
-)
-
-
-# ============================================================
-# RENAME DUPLICATE-LIKE LONGITUDINAL FIELDS
-# ============================================================
-
-print_section("STANDARDIZING LONGITUDINAL FEATURE NAMES")
 
 longitudinal_selected = longitudinal_selected.rename(
     columns={
@@ -517,125 +696,10 @@ longitudinal_selected = longitudinal_selected.rename(
     }
 )
 
-print("✓ Longitudinal names standardized.")
-
-
-# ============================================================
-# CHECK COLUMN COLLISIONS
-# ============================================================
-
-print_section("CHECKING COLUMN COLLISIONS")
-
-base_columns = set(base.columns)
-
-performance_merge_columns = set(
-    performance_selected.columns
-) - {
-    "Rndrng_NPI",
-    "Year",
-}
-
-longitudinal_merge_columns = set(
-    longitudinal_selected.columns
-) - {
-    "Rndrng_NPI",
-}
-
-performance_collisions = (
-    base_columns & performance_merge_columns
-)
-
-longitudinal_collisions = (
-    base_columns & longitudinal_merge_columns
-)
-
 print(
-    "Performance collisions:"
+    f"Longitudinal features selected: "
+    f"{len(longitudinal_selected.columns) - 1}"
 )
-
-if performance_collisions:
-    for col in sorted(performance_collisions):
-        print(f"  ⚠ {col}")
-else:
-    print("  ✓ None")
-
-print(
-    "\nLongitudinal collisions:"
-)
-
-if longitudinal_collisions:
-    for col in sorted(longitudinal_collisions):
-        print(f"  ⚠ {col}")
-else:
-    print("  ✓ None")
-
-
-if performance_collisions:
-    raise ValueError(
-        "Performance feature collision detected. "
-        "Resolve before merging."
-    )
-
-if longitudinal_collisions:
-    raise ValueError(
-        "Longitudinal feature collision detected. "
-        "Resolve before merging."
-    )
-
-
-# ============================================================
-# MERGE PERFORMANCE
-# ============================================================
-
-print_section("MERGING PROVIDER PERFORMANCE FEATURES")
-
-original_rows = len(base)
-
-final_df = base.merge(
-    performance_selected,
-    on=[
-        "Rndrng_NPI",
-        "Year",
-    ],
-    how="left",
-    validate="one_to_one",
-)
-
-print(
-    f"Rows after performance merge: "
-    f"{len(final_df):,}"
-)
-
-if len(final_df) != original_rows:
-    raise ValueError(
-        "Performance merge changed row count."
-    )
-
-print("✓ Row count preserved.")
-
-
-# ============================================================
-# VALIDATE PERFORMANCE MERGE
-# ============================================================
-
-performance_feature_check = [
-    "utilization_score",
-    "cost_score",
-    "provider_segment",
-]
-
-print(
-    "\nPerformance feature coverage:"
-)
-
-for column in performance_feature_check:
-
-    missing = final_df[column].isna().sum()
-
-    print(
-        f"{column}: "
-        f"{missing:,} missing"
-    )
 
 
 # ============================================================
@@ -644,6 +708,24 @@ for column in performance_feature_check:
 
 print_section("MERGING LONGITUDINAL FEATURES")
 
+longitudinal_merge_columns = set(
+    longitudinal_selected.columns
+) - {
+    "Rndrng_NPI",
+}
+
+collisions = (
+    set(final_df.columns)
+    & longitudinal_merge_columns
+)
+
+if collisions:
+
+    raise ValueError(
+        f"Longitudinal column collisions detected: "
+        f"{sorted(collisions)}"
+    )
+
 final_df = final_df.merge(
     longitudinal_selected,
     on="Rndrng_NPI",
@@ -651,21 +733,18 @@ final_df = final_df.merge(
     validate="many_to_one",
 )
 
-print(
-    f"Rows after longitudinal merge: "
-    f"{len(final_df):,}"
-)
-
 if len(final_df) != original_rows:
+
     raise ValueError(
         "Longitudinal merge changed row count."
     )
 
+print("✓ Longitudinal merge completed.")
 print("✓ Row count preserved.")
 
 
 # ============================================================
-# CHECK FINAL GRAIN
+# FINAL GRAIN
 # ============================================================
 
 print_section("VALIDATING FINAL DATASET GRAIN")
@@ -673,7 +752,7 @@ print_section("VALIDATING FINAL DATASET GRAIN")
 final_duplicates = final_df.duplicated(
     subset=[
         "Rndrng_NPI",
-        "Year"
+        "Year",
     ]
 ).sum()
 
@@ -683,18 +762,19 @@ print(
 )
 
 if final_duplicates != 0:
+
     raise ValueError(
         "Final dataset contains duplicate NPI-Year rows."
     )
 
-print("✓ NPI + Year grain preserved.")
+print("✓ Final NPI-Year grain passed.")
 
 
 # ============================================================
-# CHECK ACO
+# FINAL ACO VALIDATION
 # ============================================================
 
-print_section("VALIDATING ACO COVERAGE")
+print_section("VALIDATING FINAL ACO DATA")
 
 missing_aco = final_df["ACO_ID"].isna().sum()
 
@@ -705,35 +785,40 @@ unique_acos = (
 )
 
 print(
-    f"Missing ACO_ID: {missing_aco:,}"
+    f"Missing ACO_ID: "
+    f"{missing_aco:,}"
 )
 
 print(
-    f"Unique ACOs: {unique_acos:,}"
+    f"Unique ACOs: "
+    f"{unique_acos:,}"
 )
 
 if missing_aco != 0:
+
     raise ValueError(
         "Final dataset contains missing ACO_ID values."
     )
 
-print("✓ All rows have ACO_ID.")
+print("✓ Final ACO validation passed.")
 
 
 # ============================================================
-# FINAL FEATURE COVERAGE
+# FINAL FEATURE VALIDATION
 # ============================================================
 
-print_section("CHECKING FINAL PERFORMANCE FEATURES")
+print_section("VALIDATING FINAL FEATURES")
 
 required_final_features = [
     "utilization_score",
     "cost_score",
     "provider_segment",
+
     "high_utilization_flag",
     "high_cost_flag",
     "low_utilization_flag",
     "low_cost_flag",
+
     "dominant_provider_segment",
     "segment_year_count",
     "segment_stability",
@@ -749,27 +834,24 @@ for column in required_final_features:
             f"Missing final feature: {column}"
         )
 
-    print(f"✓ {column}")
+    print(
+        f"✓ {column}"
+    )
 
 
 # ============================================================
-# CHECK LONGITUDINAL NULLS
+# LONGITUDINAL COVERAGE
 # ============================================================
 
 print_section("CHECKING LONGITUDINAL COVERAGE")
 
-longitudinal_check = [
-    "longitudinal_years_observed",
-    "longitudinal_first_year",
-    "longitudinal_last_year",
+for column in [
     "dominant_provider_segment",
     "segment_year_count",
     "segment_stability",
     "overall_provider_segment",
     "history_class",
-]
-
-for column in longitudinal_check:
+]:
 
     missing = final_df[column].isna().sum()
 
@@ -780,10 +862,15 @@ for column in longitudinal_check:
 
 
 # ============================================================
-# SAVE
+# SAVE FINAL DATASET
 # ============================================================
 
 print_section("SAVING FINAL DATASET")
+
+OUTPUT_FILE.parent.mkdir(
+    parents=True,
+    exist_ok=True
+)
 
 final_df.to_csv(
     OUTPUT_FILE,
@@ -791,7 +878,7 @@ final_df.to_csv(
 )
 
 print(
-    f"✓ Final dataset saved successfully:"
+    "✓ Final dataset saved:"
 )
 
 print(
@@ -840,18 +927,11 @@ print(
     f"{missing_aco:,}"
 )
 
-print("\nPerformance layer:")
-print("✓ utilization_score")
-print("✓ cost_score")
-print("✓ provider_segment")
-print("✓ performance flags")
-
-print("\nLongitudinal layer:")
-print("✓ dominant_provider_segment")
-print("✓ segment_year_count")
-print("✓ segment_stability")
-print("✓ overall_provider_segment")
-print("✓ history_class")
+print("\nPipeline layers:")
+print("✓ Stage 4 provider features")
+print("✓ ACO provider mapping")
+print("✓ Provider performance")
+print("✓ Provider longitudinal profile")
 
 print("\nOutput:")
 print(OUTPUT_FILE)
