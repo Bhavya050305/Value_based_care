@@ -1,0 +1,57 @@
+# Environment files
+.env
+.env.*
+!.env.example
+backend/.env
+backend/.env.*
+!backend/.env.example
+frontend/.env
+frontend/.env.*
+!frontend/.env.example
+
+# Virtual Environments
+.venv/
+venv/
+myenv/
+env/
+backend/.venv/
+backend/venv/
+backend/myenv/
+
+# Python Cache & Testing
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Node & Frontend Build
+node_modules/
+frontend/node_modules/
+dist/
+frontend/dist/
+.vite/
+
+# ML Large Model Artifacts / Datasets (Keep gitkeep)
+app/ml/artifacts/*.joblib
+app/ml/artifacts/*.pkl
+backend/app/ml/artifacts/*.joblib
+backend/app/ml/artifacts/*.pkl
+
+# Antigravity IDE & System Brain Data
+brain/
+.system_generated/
+.user_uploaded/
+scratch/
+
+# Text Dumps & Log Files
+*.log
+backend/.str.txt
+backend/backend_structure.txt
+
+# OS & IDE Files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

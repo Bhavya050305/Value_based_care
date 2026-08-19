@@ -1,0 +1,23 @@
+{
+    "model_type": "Linear Regression",
+    "best_version": "Basic",
+    "MAE": 2.0880540047505303,
+    "RMSE": 2.8605422214653675,
+    "R2": 0.6037979117049095,
+    "features": [
+        "performance_year",
+        "SavingsRate",
+        "previous_savings_rate",
+        "savings_rate_change"
+    ],
+    "target": "target_next_year",
+    "train_years": "2020-2022",
+    "test_year": "2023 predicting 2024",
+    "preprocessing": [
+        "Sav_rate with Sav_Rate fallback",
+        "Training-only median imputation",
+        "Training-only 1%-99% clipping",
+        "StandardScaler",
+        "Linear Regression"
+    ]
+}

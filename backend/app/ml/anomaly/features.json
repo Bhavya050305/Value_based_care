@@ -1,0 +1,14 @@
+{
+  "features": [
+    "ed_utilization_change_yoy",
+    "admission_change_yoy",
+    "em_utilization_change_yoy",
+    "advanced_imaging_change_yoy",
+    "readmission_proxy_rate_yoy_change",
+    "savings_yoy_change_pct",
+    "expenditure_variance_pct",
+    "quality_change_yoy",
+    "provider_utilization_variation",
+    "provider_cost_variation"
+  ]
+}

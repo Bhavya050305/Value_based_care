@@ -1,15 +1,41 @@
-fastapi
-uvicorn[standard]
-pydantic
-sqlalchemy
-alembic
-psycopg2-binary
-pandas
-numpy
-scikit-learn
-shap
-joblib
-python-dotenv
-httpx
-pytest
-pytest-asyncio
+# FastAPI and server
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+
+# Validation and settings
+pydantic>=2.7.0
+pydantic-settings>=2.3.0
+email-validator>=2.1.0
+
+# Database
+sqlalchemy[asyncio]>=2.0.30
+asyncpg>=0.29.0
+alembic>=1.13.0
+psycopg2-binary>=2.9.9
+
+# Auth and HTTP
+python-jose[cryptography]>=3.3.0
+httpx>=0.27.0
+
+# Cache and background jobs
+redis>=5.0.0
+
+# Data processing (ingestion scripts)
+pandas>=2.2.0
+numpy>=1.26.0
+
+# ML (inference/training scripts only — not invoked in Phase 1)
+scikit-learn>=1.4.0
+xgboost>=2.0.0
+lightgbm>=4.3.0
+shap>=0.45.0
+joblib>=1.3.0
+pyyaml>=6.0.0
+
+# Utilities
+python-dotenv>=1.0.0
+python-multipart>=0.0.9
+
+# Testing
+pytest>=8.2.0
+pytest-asyncio>=0.23.0
