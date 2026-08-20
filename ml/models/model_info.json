@@ -1,0 +1,27 @@
+{
+    "model": "Gradient Boosting Regressor",
+    "training_period": "2022 -> 2023",
+    "prediction_period": "2023 -> 2024",
+    "training_rows": 415,
+    "prediction_rows": 407,
+    "numeric_features": 65,
+    "categorical_features": 4,
+    "total_features": 69,
+    "cv_r2": 0.8798928262513729,
+    "cv_mae": 1.0450998865883827,
+    "cv_rmse": 1.4555630782696687,
+    "2024_r2": 0.8509312313319214,
+    "2024_mae": 1.2163070597730299,
+    "2024_rmse": 1.7472408146491731,
+    "accuracy_percentage": 75.18427518427518,
+    "best_parameters": {
+        "model__learning_rate": 0.05,
+        "model__loss": "huber",
+        "model__max_depth": 3,
+        "model__min_samples_leaf": 5,
+        "model__n_estimators": 300,
+        "model__subsample": 0.9
+    },
+    "target": "Sav_rate",
+    "trend_threshold": 0.25
+}
