@@ -1,0 +1,56 @@
+{
+  "results": {
+    "Isolation Forest": {
+      "precision": 0.657,
+      "recall": 0.199,
+      "f1": 0.306,
+      "n_flagged": 99,
+      "n_new_catches": 34
+    },
+    "LOF": {
+      "precision": 0.253,
+      "recall": 0.077,
+      "f1": 0.118,
+      "n_flagged": 99,
+      "n_new_catches": 74
+    },
+    "One-Class SVM": {
+      "precision": 0.545,
+      "recall": 0.169,
+      "f1": 0.258,
+      "n_flagged": 101,
+      "n_new_catches": 46
+    }
+  },
+  "winner": "Isolation Forest",
+  "feature_cols": [
+    "ed_utilization_change_yoy",
+    "admission_change_yoy",
+    "em_utilization_change_yoy",
+    "advanced_imaging_change_yoy",
+    "readmission_proxy_rate_yoy_change",
+    "savings_yoy_change_pct",
+    "expenditure_variance_pct",
+    "quality_change_yoy",
+    "provider_utilization_variation",
+    "provider_cost_variation"
+  ],
+  "training_years": [
+    2021,
+    2022,
+    2023
+  ],
+  "contamination": 0.08,
+  "n_training_rows": 1238,
+  "imputation_values": {
+    "ed_utilization_change_yoy": 0.06327413856739394,
+    "admission_change_yoy": 0.030094907845788152,
+    "em_utilization_change_yoy": 0.091053706636253,
+    "advanced_imaging_change_yoy": 0.08557710990029545,
+    "readmission_proxy_rate_yoy_change": 0.0,
+    "savings_yoy_change_pct": -4.35793814902936,
+    "quality_change_yoy": -4.854999999999995,
+    "provider_utilization_variation": 0.0735563000268434,
+    "provider_cost_variation": 0.131659350048774
+  }
+}
