@@ -1,0 +1,6 @@
+{
+  "model_name": "aco_peer_target_finder",
+  "version": "1.0",
+  "model_type": "NearestNeighbors",
+  "target": "Peer Benchmark (SavingsPct, QualScore, PMPM)"
+}
